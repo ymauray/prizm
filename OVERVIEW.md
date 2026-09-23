@@ -183,11 +183,8 @@ Son et App :
 ### Reste en suspens
 
 - Tests visuels de l'ULA (`btime`, `stime`, `ulatest3`) : licence et références à trouver.
-- TZX : pas d'accélération des chargeurs (FUSE raccourcit les boucles des chargeurs qu'il
-  reconnaît ; ici, seul le turbo accélère) ; bloc « select » (`0x28`) ignoré ; les blocs CSW et
-  « generalized data » sont décodés en mémoire à l'ouverture.
-- `SAVE` passe par la ROM seulement : un programme qui sauvegarde avec sa propre routine
-  (sans `SA-BYTES`) n'enregistre rien, faute de capture du signal MIC.
+- TZX : bloc « select » (`0x28`) ignoré ; les blocs CSW et « generalized data » sont décodés
+  en mémoire à l'ouverture.
 
 Souhaitable un jour, sans échéance :
 
@@ -198,6 +195,10 @@ Souhaitable un jour, sans échéance :
   redistribution claire : l'utilisateur la mettrait dans `local/` ;
 - les formats de cassette **`.CSW`** (signal brut, déjà décodé dans le bloc TZX `0x18`) et
   **`.PZX`** ;
+- l'**accélération des chargeurs** : FUSE raccourcit les boucles des chargeurs qu'il
+  reconnaît ; ici, seul le turbo accélère ;
+- le **`SAVE` sans la ROM** : capturer le signal MIC, pour enregistrer un programme qui
+  sauvegarde avec sa propre routine (sans `SA-BYTES`) ;
 - la **NMI** (saut en `0x0066`), qui n'a d'intérêt qu'avec une interface qui s'en sert, comme le
   Multiface.
 
