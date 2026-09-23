@@ -22,7 +22,7 @@ Une barre de menu, en haut de la fenêtre, réunit toutes les commandes avec leu
 |---|---|
 | **File** | Open... (Cmd+O), Save snapshot (Cmd+S), Show snapshot folder (Cmd+F), Quit (Cmd+Q) |
 | **Machine** | ZX Spectrum 48K (Cmd+1), ZX Spectrum 128K (Cmd+2), Reset (Cmd+R) |
-| **Tape** | Play / Stop (Cmd+Shift+P), Rewind, Fast loading (Cmd+L), Turbo while loading (Cmd+T) |
+| **Tape** | Insert tape... (Cmd+Shift+O), Play / Stop (Cmd+Shift+P), Rewind, Fast loading (Cmd+L), Turbo while loading (Cmd+T) |
 | **Debug** | Show debugger (Cmd+D), Pause / Continue (Cmd+P), Step into (Cmd+I), Step over (Cmd+N), Step out (Cmd+U) |
 
 **File > Reload** (Cmd+Shift+R) rouvre le dernier fichier ouvert.
@@ -79,7 +79,9 @@ blocs se chargent toujours en temps réel, même en chargement rapide, et **Turb
 les accélère. La cassette démarre d'elle-même quand la ROM ou un chargeur écoute le signal, et
 s'arrête aux blocs qui le demandent (entre deux niveaux, par exemple). Si un programme attend
 qu'on relance la cassette sans l'écouter, **Tape > Play / Stop** (Cmd+Shift+P) la relance ;
-**Tape > Rewind** la rembobine.
+**Tape > Rewind** la rembobine. Pour un jeu en plusieurs faces ou cassettes, **Tape > Insert
+tape...** (Cmd+Shift+O) met une autre cassette dans le lecteur sans redémarrer la machine,
+contrairement à **File > Open**.
 
 **Cmd+S** sauvegarde l'état de la machine en `.SNA` dans `~/Documents/iSpectrum/`, et
 **Cmd+F** ouvre ce dossier dans le Finder. Les jeux ne doivent jamais être ajoutés au dépôt :
