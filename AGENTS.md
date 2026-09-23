@@ -71,6 +71,8 @@ machine et plan par jalons.
   copyright (à mentionner : README, fenêtre « À propos ») ; interdiction de vendre les ROM ou de
   les intégrer dans du matériel. Texte exact dans `roms/README.md`.
 - Fichiers de tests tiers (FUSE, ZEXDOC/ZEXALL) : conserver leurs licences et leur provenance
-  dans `tests/.../README.md`.
+  dans `tests/.../README.md`. Un fichier de test dont la licence n'est pas claire reste dans
+  `local/` ; les tests qui en dépendent sont alors ignorés s'il manque (voir
+  `tests/iSpectrum.Core.Tests/ThirdParty/LocalFile.cs`).
 - Ne jamais committer de jeux commerciaux ; les fichiers de test personnels vont dans un dossier
   ignoré par Git (ex. `local/`).

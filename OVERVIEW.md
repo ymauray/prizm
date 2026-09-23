@@ -54,6 +54,8 @@ Ce qui existe :
 - Beeper : silence, nombre d'échantillons sur 50 frames, moyenne dans un échantillon, et
   `BEEP 1,0` joué par la vraie ROM, dont la hauteur (do, 261,6 Hz) est vérifiée.
 - Bordure : un changement de couleur apparaît à la position du faisceau où il a eu lieu.
+- Timing (Richard Butler) : 68 tests de durée d'instructions, en mémoire contendue ou non,
+  comparés aux mesures sur machine réelle ; ignorés si `local/timing-tests/` est absent.
 - Contention : table des délais, durée exacte d'un `NOP` en RAM contendue ou non et d'un `OUT`
   vers l'ULA, et une couleur changée en plein milieu d'une rangée de caractères, qui ne touche
   que les lignes sous le faisceau.
@@ -140,9 +142,9 @@ Reste en suspens :
 
 **Prochaine étape : suites de test tierces**, avant le jalon 8 :
 
-1. les tests de timing de zxspectrum4.net (35 groupes, instructions en mémoire contendue ou non),
-   déjà empaquetés avec leurs valeurs attendues par MrKWatkins/EmulatorTestSuites : à brancher
-   dans xUnit ; licence à vérifier (dans `local/` en attendant) ;
+1. ~~les tests de timing de Richard Butler (zxspectrum4.net)~~ : **faits** — les 68 tests des
+   groupes 1 à 34 passent (machine « early timing ») ; les tests 35 à 37 attendent le bus
+   flottant ; le programme reste dans `local/timing-tests/` (licence à vérifier) ;
 2. `btime.tap`, `stime.tap`, `ulatest3.tap` (Spectrum Clone Design) : timing de la bordure, de
    l'écran et du bus flottant, à vérifier à l'œil ; auteurs et licence à vérifier ;
 3. z80test de Patrik Rak (MIT) : tests CPU plus poussés que FUSE (dont `SCF`/`CCF` et le registre
