@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026 The iSpectrum contributors
 
+using iSpectrum.Core.Tape;
+
 namespace iSpectrum.Core.Tests.Tape;
 
 /// <summary>The real ROM loads a tape from the signal, as it would from a cassette.</summary>
@@ -67,6 +69,53 @@ public class TapeLoadingTests
         }
 
         Assert.InRange(signChanges, 26, 38);
+    }
+
+    [Fact]
+    public void FastLoad_LoadsTheProgramInAFewFrames()
+    {
+        var spectrum = TestMachine.Boot();
+        spectrum.FastLoad = true;
+        spectrum.Tape.Insert(TapeBuilder.HelloProgram());
+
+        TypeLoad(spectrum);
+        spectrum.RunFrames(10);
+
+        Assert.Equal(FindRow(spectrum, "Program: hello ") + 1, FindRow(spectrum, "HI "));
+        Assert.StartsWith("0 OK, 10:1", ScreenText.ReadRow(spectrum.Memory.Contents, 23));
+        Assert.True(spectrum.Tape.AtEnd);
+    }
+
+    [Fact]
+    public void FastLoad_SkipsABlockWithTheWrongFlag_AsTheRomDoes()
+    {
+        // A stray data block before the program: LOAD "" wants a header first, so it skips it.
+        var hello = TapeBuilder.HelloProgram();
+        var tape = TapeBuilder.Tap(TapFile.MakeBlock(0xFF, [1, 2, 3]), hello.Blocks[0], hello.Blocks[1]);
+        var spectrum = TestMachine.Boot();
+        spectrum.FastLoad = true;
+        spectrum.Tape.Insert(tape);
+
+        TypeLoad(spectrum);
+        spectrum.RunFrames(10);
+
+        Assert.True(FindRow(spectrum, "HI ") > 0);
+    }
+
+    [Fact]
+    public void FastLoad_ReportsABadChecksum_AsATapeLoadingError()
+    {
+        var hello = TapeBuilder.HelloProgram();
+        var corrupted = (byte[])hello.Blocks[1].Clone();
+        corrupted[^1] ^= 0x01;
+        var spectrum = TestMachine.Boot();
+        spectrum.FastLoad = true;
+        spectrum.Tape.Insert(TapeBuilder.Tap(hello.Blocks[0], corrupted));
+
+        TypeLoad(spectrum);
+        spectrum.RunFrames(10);
+
+        Assert.StartsWith("R Tape loading error", ScreenText.ReadRow(spectrum.Memory.Contents, 23));
     }
 
     private static int FindRow(Spectrum48 spectrum, string start)

@@ -17,6 +17,15 @@ public sealed class Spectrum48
     /// <summary>LD-BYTES, the ROM routine that loads a block from tape.</summary>
     private const ushort LdBytes = 0x0556;
 
+    /// <summary>
+    /// LD-BREAK, inside LD-BYTES once it has saved its arguments: the expected flag byte in A',
+    /// LOAD (carry set) or VERIFY in F', the destination in IX and the length in DE.
+    /// </summary>
+    private const ushort LdBytesReady = 0x056B;
+
+    /// <summary>The end of LD-BYTES: LD A,H / CP 1 / RET. H = 0 (checksum right) sets carry: success.</summary>
+    private const ushort LdBytesExit = 0x05DF;
+
     public Spectrum48(ReadOnlySpan<byte> rom)
     {
         Memory = new Memory48K(rom);
@@ -36,6 +45,12 @@ public sealed class Spectrum48
 
     /// <summary>The tape deck. It starts playing when the ROM starts loading.</summary>
     public TapePlayer Tape => Ula.Tape;
+
+    /// <summary>
+    /// When set, LD-BYTES is intercepted and each block is copied straight into memory instead of
+    /// being played; when clear, the ROM reads the tape signal in real time.
+    /// </summary>
+    public bool FastLoad { get; set; }
 
     /// <summary>The picture of the last completed frame (see <see cref="Ula.FrameBuffer"/>).</summary>
     public ReadOnlySpan<uint> FrameBuffer => Ula.FrameBuffer;
@@ -60,9 +75,16 @@ public sealed class Spectrum48
                 interruptTaken = Cpu.Interrupt();
             }
 
-            // Press "play" when the ROM starts listening to the tape.
-            if (Cpu.PC == LdBytes && !Tape.IsPlaying)
+            if (FastLoad)
             {
+                if (Cpu.PC == LdBytesReady && !Tape.AtEnd)
+                {
+                    LoadBlockAtOnce();
+                }
+            }
+            else if (Cpu.PC == LdBytes && !Tape.IsPlaying)
+            {
+                // Press "play" when the ROM starts listening to the tape.
                 Tape.Play(Cpu.TStates);
             }
 
@@ -72,5 +94,56 @@ public sealed class Spectrum48
         Ula.EndFrameSound(Cpu.TStates, FrameTStates);
         Cpu.TStates -= FrameTStates;
         Ula.EndFrame(Memory.Contents);
+    }
+
+    /// <summary>
+    /// Does the work of LD-BYTES on the next tape block, then jumps to the routine's end, which
+    /// turns H into the result: H is the XOR of every byte read, checksum included, so 0 when the
+    /// block is intact. A block with the wrong flag is used up and fails, as on a real tape: the
+    /// ROM then tries the next one. Technique from FUSE's tape traps.
+    /// </summary>
+    private void LoadBlockAtOnce()
+    {
+        var block = Tape.TakeBlock()!;
+        var load = (Cpu.F_ & 0x01) != 0;
+        Cpu.H = block.Length > 0 && block[0] == Cpu.A_ ? CopyBlock(block, load) : (byte)0xFF;
+        Cpu.PC = LdBytesExit;
+    }
+
+    /// <summary>
+    /// Loads (or verifies) DE bytes at IX, as LD-BYTES does, moving IX and DE along. Returns the
+    /// XOR of the flag, the data and the checksum byte, or 0xFF if the block is too short or a
+    /// verified byte differs.
+    /// </summary>
+    private byte CopyBlock(byte[] block, bool load)
+    {
+        var parity = block[0];
+        var index = 1;
+
+        while (Cpu.D != 0 || Cpu.E != 0)
+        {
+            if (index >= block.Length)
+            {
+                return 0xFF;
+            }
+
+            var value = block[index++];
+            if (load)
+            {
+                Memory.Write(Cpu.IX, value);
+            }
+            else if (Memory.Read(Cpu.IX) != value)
+            {
+                return 0xFF;
+            }
+
+            parity ^= value;
+            Cpu.IX++;
+            var length = (ushort)(((Cpu.D << 8) | Cpu.E) - 1);
+            (Cpu.D, Cpu.E) = ((byte)(length >> 8), (byte)length);
+        }
+
+        // The byte after the data is the checksum.
+        return index < block.Length ? (byte)(parity ^ block[index]) : (byte)0xFF;
     }
 }
