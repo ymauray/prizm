@@ -337,7 +337,7 @@ public sealed partial class Z80Cpu
                 break;
 
             case 3:
-                ExecuteX3Z3(opcode, y);
+                ExecuteX3Z3(y);
                 break;
 
             case 4:
@@ -384,7 +384,7 @@ public sealed partial class Z80Cpu
     }
 
     /// <summary>JP nn, CB prefix, OUT (n),A, IN A,(n), EX (SP),HL, EX DE,HL, DI, EI.</summary>
-    private void ExecuteX3Z3(byte opcode, int y)
+    private void ExecuteX3Z3(int y)
     {
         switch (y)
         {
@@ -394,7 +394,8 @@ public sealed partial class Z80Cpu
                 break;
 
             case 1:
-                throw PrefixNotImplemented(opcode);
+                ExecuteCb();
+                break;
 
             case 2:
             {
