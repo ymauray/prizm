@@ -47,7 +47,7 @@ public class FuseTests
             cpu.Step();
         }
 
-        Assert.Equal(expected.State, GetState(cpu));
+        AssertSameState(name, expected.State, GetState(cpu));
         AssertSameEvents(expected.Events, events);
 
         var expectedMemory = new FuseMemory();
@@ -67,6 +67,31 @@ public class FuseTests
             var wanted = expectedMemory.Peek((ushort)address);
             Assert.True(actual == wanted, $"Memory at {address:X4}: expected {wanted:X2}, got {actual:X2}");
         }
+    }
+
+    /// <summary>
+    /// Cases that stop a block instruction right after one repeat. FUSE predates David Banks's
+    /// 2018 findings: while INIR, OTIR, CPDR and the like repeat, flag bits 5 and 3 come from PC,
+    /// the I/O ones also recompute H and P/V, and MEMPTR becomes PC + 1. z80test, measured on a
+    /// real 48K, checks that behaviour, so here it wins over FUSE's expected values.
+    /// </summary>
+    private static readonly HashSet<string> InterruptedBlockCases = ["edb2_1", "edb3_1", "edb9_2", "edba_1", "edbb_1"];
+
+    /// <summary>Flag bits a repeating block instruction sets differently from FUSE: 5, H, 3, P/V.</summary>
+    private const int InterruptedBlockFlags = 0x3C;
+
+    private static void AssertSameState(string name, FuseCpuState expected, FuseCpuState actual)
+    {
+        if (!InterruptedBlockCases.Contains(name))
+        {
+            Assert.Equal(expected, actual);
+            return;
+        }
+
+        // Everything else still has to match FUSE exactly.
+        Assert.Equal(0, (expected.AF ^ actual.AF) & ~InterruptedBlockFlags);
+        Assert.Equal((ushort)(actual.PC + 1), actual.MEMPTR);
+        Assert.Equal(expected with { AF = actual.AF, MEMPTR = actual.MEMPTR }, actual);
     }
 
     /// <summary>

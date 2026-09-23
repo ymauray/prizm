@@ -237,6 +237,8 @@ public sealed partial class Z80Cpu
         {
             Internal((ushort)(HL - step), 5);
             PC -= 2;
+            WZ = (ushort)(PC + 1);
+            SetInterruptedBlockIoFlags(value);
         }
     }
 
@@ -257,6 +259,8 @@ public sealed partial class Z80Cpu
         {
             Internal(BC, 5);
             PC -= 2;
+            WZ = (ushort)(PC + 1);
+            SetInterruptedBlockIoFlags(value);
         }
     }
 
@@ -273,11 +277,58 @@ public sealed partial class Z80Cpu
             | (Sz53P[(sum & 7) ^ B] & FlagPV));
     }
 
+    /// <summary>
+    /// Rewinds a repeating LDIR/LDDR/CPIR/CPDR. While the instruction repeats, flag bits 3 and 5
+    /// come from bits 11 and 13 of PC, now back on the instruction (David Banks, 2018; checked by
+    /// z80test's "->NOP'" tests, which stop an instruction after one repeat).
+    /// </summary>
     private void RepeatBlock(ushort address)
     {
         Internal(address, 5);
         PC -= 2;
         WZ = (ushort)(PC + 1);
+        SetFlagsFromPc();
+    }
+
+    private void SetFlagsFromPc() =>
+        F = (byte)((F & ~(Flag5 | Flag3)) | ((PC >> 8) & (Flag5 | Flag3)));
+
+    /// <summary>
+    /// Flags of a repeating INIR/INDR/OTIR/OTDR: bits 3 and 5 from PC as for the other block
+    /// instructions, and P/V and H recomputed from B and the byte transferred (as in MAME's Z80,
+    /// after David Banks's analysis). MEMPTR becomes PC + 1, as for the other repeats.
+    /// </summary>
+    private void SetInterruptedBlockIoFlags(byte value)
+    {
+        SetFlagsFromPc();
+
+        int parityOf;
+        if ((F & FlagC) != 0)
+        {
+            var flags = F & ~FlagH;
+            if ((value & 0x80) != 0)
+            {
+                parityOf = (B - 1) & 0x07;
+                flags |= (B & 0x0F) == 0x00 ? FlagH : 0;
+            }
+            else
+            {
+                parityOf = (B + 1) & 0x07;
+                flags |= (B & 0x0F) == 0x0F ? FlagH : 0;
+            }
+
+            F = (byte)flags;
+        }
+        else
+        {
+            parityOf = B & 0x07;
+        }
+
+        // P/V flips when that value has odd parity.
+        if ((Sz53P[parityOf] & FlagPV) == 0)
+        {
+            F ^= FlagPV;
+        }
     }
 
     private ushort Adc16(ushort left, ushort right)
