@@ -153,7 +153,6 @@ public abstract class Spectrum
                     if (Tape.TakeBlock() is { } block)
                     {
                         LoadBlockAtOnce(block);
-                        Tape.PlayIfTurboBlockFollows(Cpu.TStates);
                     }
                     else
                     {

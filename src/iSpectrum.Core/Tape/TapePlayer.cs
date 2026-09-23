@@ -29,6 +29,11 @@ public sealed class TapePlayer : ISoundSource
     /// </summary>
     private const int MaxSilentEdges = 100_000;
 
+    // Loader detection, after FUSE (loader.c): reads of the ULA port this close together
+    // (T-states), each with B one more or one less than the last, in a row.
+    private const int LoaderReadInterval = 500;
+    private const int LoaderReads = 10;
+
     private TapeImage _tape = new([]);
     private TapeCursor _cursor = new(new([]));
     private bool _playing;
@@ -38,6 +43,11 @@ public sealed class TapePlayer : ISoundSource
 
     /// <summary>T-state (from the start of the current frame) of the next edge.</summary>
     private long _nextEdge;
+
+    /// <summary>The last read of the ULA port (T-state of the current frame) and B at that time.</summary>
+    private long _lastRead = -100_000;
+    private byte _lastB;
+    private int _loaderReads;
 
     /// <summary>The level on the EAR input.</summary>
     public bool Level { get; private set; }
@@ -69,6 +79,7 @@ public sealed class TapePlayer : ISoundSource
     {
         _playing = false;
         _stopAfterEdge = false;
+        _loaderReads = 0;
         _cursor.Rewind();
         Level = false;
     }
@@ -85,6 +96,29 @@ public sealed class TapePlayer : ISoundSource
     }
 
     public void Stop() => _playing = false;
+
+    /// <summary>
+    /// Called on each read of the ULA port, with the CPU's B register: starts the tape when a
+    /// program reads it as loaders do, in a tight loop that counts in B, as the ROM's own
+    /// LD-EDGE. Turbo loaders start this way, as a user would press "play" for them. The tape
+    /// is not stopped when the reads stop: loaders that count elsewhere would lose it.
+    /// </summary>
+    public void OnPortRead(long now, byte b)
+    {
+        var interval = now - _lastRead;
+        var step = (byte)(b - _lastB);
+        _lastRead = now;
+        _lastB = b;
+
+        if (_playing || AtEnd || interval > LoaderReadInterval || (step != 1 && step != 0xFF))
+        {
+            _loaderReads = 0;
+        }
+        else if (++_loaderReads >= LoaderReads)
+        {
+            Play(now);
+        }
+    }
 
     /// <summary>
     /// For fast loading, which copies blocks straight into memory: takes the next block whole,
@@ -107,34 +141,6 @@ public sealed class TapePlayer : ISoundSource
         _playing = false;
         _cursor.MoveTo(CurrentBlock + 1);
         return data;
-    }
-
-    /// <summary>
-    /// After a block taken by fast loading: when the next block with sound is not one the ROM
-    /// can read, what was just loaded is likely the loader that reads it, so the tape starts,
-    /// after the pause of the block taken (<paramref name="now"/> is a T-state of the frame).
-    /// </summary>
-    public void PlayIfTurboBlockFollows(long now)
-    {
-        var pause = CurrentBlock > 0 ? _tape.Blocks[CurrentBlock - 1].PauseTStates : 0;
-        for (var i = CurrentBlock; i < _tape.Blocks.Count; i++)
-        {
-            var block = _tape.Blocks[i];
-            if (block.Kind == TapeBlockKind.Sound)
-            {
-                if (block.RomData is null)
-                {
-                    Play(now + pause);
-                }
-
-                return;
-            }
-
-            if (block.Kind is not (TapeBlockKind.Info or TapeBlockKind.Pause))
-            {
-                return;
-            }
-        }
     }
 
     /// <summary>Plays the tape up to <paramref name="time"/>, telling the beeper about each change of level.</summary>
@@ -165,9 +171,10 @@ public sealed class TapePlayer : ISoundSource
                 beeper.SetTapeLevel(_nextEdge, level);
             }
 
-            _nextEdge += edge.Duration;
             _stopAfterEdge = (edge.Flags & (TapeEdgeFlags.Stop | TapeEdgeFlags.EndOfTape)) != 0
                 || (Is48K && (edge.Flags & TapeEdgeFlags.Stop48) != 0);
+
+            _nextEdge += edge.Duration;
 
             silentEdges = edge.Duration == 0 ? silentEdges + 1 : 0;
             if (silentEdges > MaxSilentEdges)
@@ -177,9 +184,10 @@ public sealed class TapePlayer : ISoundSource
         }
     }
 
-    /// <summary>Makes the next edge relative to the next frame.</summary>
+    /// <summary>Makes the next edge, and the last read, relative to the next frame.</summary>
     public void EndFrame(int frameTStates)
     {
+        _lastRead -= frameTStates;
         if (_playing)
         {
             _nextEdge -= frameTStates;
