@@ -16,6 +16,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Include="Fuse\tests.in;Fuse\tests.expected" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\iSpectrum.Z80\iSpectrum.Z80.csproj" />
   </ItemGroup>
 
