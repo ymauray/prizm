@@ -47,6 +47,9 @@ public sealed class Ula : IIo, IScreenWriteObserver
     private int _border;
     private int _frameCount;
 
+    /// <summary>Bit 4 of the last write to port 0xFE: the speaker, and the EAR input when no tape plays.</summary>
+    private bool _speakerHigh;
+
     // Rendering position in beam order: the next pixel to draw, the next border change to
     // apply, and the border colour in effect there.
     private int _row;
@@ -89,10 +92,14 @@ public sealed class Ula : IIo, IScreenWriteObserver
 
     /// <summary>
     /// Any even port selects the ULA: bits 0-4 are the keyboard half-rows selected by the high
-    /// byte of the port address, bit 6 is the EAR input (the tape signal while it plays, 1
-    /// otherwise), bits 5 and 7 read 1. Odd ports have nothing behind them: they read the
-    /// floating bus.
+    /// byte of the port address, bit 6 is the EAR input, bits 5 and 7 read 1. Odd ports have
+    /// nothing behind them: they read the floating bus.
     /// </summary>
+    /// <remarks>
+    /// EAR is the tape signal while it plays. Otherwise it follows bit 4 of the last write to
+    /// port 0xFE, as on an issue 3 board (the most common): the ROM leaves that bit at 0, so
+    /// reading port 0xFE with no key down gives 0xBF, the value z80test expects.
+    /// </remarks>
     public byte In(ushort port)
     {
         if ((port & 1) != 0)
@@ -103,7 +110,7 @@ public sealed class Ula : IIo, IScreenWriteObserver
         }
 
         Tape.AdvanceTo(_cpu?.TStates ?? 0, Beeper);
-        var ear = !Tape.IsPlaying || Tape.Level ? 0x40 : 0;
+        var ear = (Tape.IsPlaying ? Tape.Level : _speakerHigh) ? 0x40 : 0;
         return (byte)(0xA0 | ear | Keyboard.Read((byte)(port >> 8)));
     }
 
@@ -194,7 +201,8 @@ public sealed class Ula : IIo, IScreenWriteObserver
             _border = color;
         }
 
-        Beeper.SetLevel(time, (value & 0x10) != 0);
+        _speakerHigh = (value & 0x10) != 0;
+        Beeper.SetLevel(time, _speakerHigh);
     }
 
     /// <summary>

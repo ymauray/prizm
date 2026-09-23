@@ -66,13 +66,24 @@ public class KeyboardTests
     }
 
     [Fact]
-    public void Ula_ReturnsTheKeyboardOnEvenPorts_WithBits5To7Set()
+    public void Ula_ReturnsTheKeyboardOnEvenPorts_WithBits5And7Set()
     {
         var ula = new Ula();
         ula.Keyboard.SetKey(SpectrumKey.Enter, true);
 
-        Assert.Equal(0xFE, ula.In(0xBFFE));
-        Assert.Equal(0xFF, ula.In(0x7FFE));
+        // Bit 6 (EAR) follows the speaker bit, which is still 0.
+        Assert.Equal(0xBE, ula.In(0xBFFE));
+        Assert.Equal(0xBF, ula.In(0x7FFE));
         Assert.Equal(0xFF, ula.In(0xBFFF)); // odd port: not the ULA
+    }
+
+    [Fact]
+    public void EarBit_FollowsTheSpeakerBit_WhenNoTapePlays()
+    {
+        var ula = new Ula();
+
+        ula.Out(0x00FE, 0x10);
+
+        Assert.Equal(0xFF, ula.In(0x7FFE));
     }
 }
