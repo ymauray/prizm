@@ -159,7 +159,7 @@ while (!Raylib.WindowShouldClose() && !quit)
     // the debugger is paused, they go to its command line instead.
     if (!(showDebugger && debuggerPanel!.HasKeyboard))
     {
-        keyboardInput.Update(spectrum.Keyboard);
+        keyboardInput.Update(spectrum.Keyboard, spectrum.AutoTyper);
     }
 
     if (IsPaused())

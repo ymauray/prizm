@@ -5,8 +5,8 @@ namespace iSpectrum.Core;
 
 /// <summary>
 /// Which Spectrum keys type a given character, as printed on the 48K keyboard: letters and digits
-/// directly, capitals with Caps Shift, and the red symbols with Symbol Shift. Characters that
-/// need extended mode ([ ] { } ~ | \ ©) are not covered.
+/// directly, capitals with Caps Shift, the red symbols with Symbol Shift, and the few symbols
+/// printed under the keys ([ ] { } ~ | \ ©) with Symbol Shift in extended mode.
 /// </summary>
 public static class SpectrumCharacters
 {
@@ -85,6 +85,35 @@ public static class SpectrumCharacters
         shift = SpectrumKey.SymbolShift;
         return true;
     }
+
+    /// <summary>
+    /// Gets the key for a character typed in extended mode: Caps Shift + Symbol Shift first (the
+    /// E cursor), then Symbol Shift and <paramref name="key"/>. The ROM returns to the L cursor
+    /// on its own after the character.
+    /// </summary>
+    public static bool TryGetExtendedKey(char c, out SpectrumKey key)
+    {
+        SpectrumKey? extended = c switch
+        {
+            '[' => SpectrumKey.Y,
+            ']' => SpectrumKey.U,
+            '{' => SpectrumKey.F,
+            '}' => SpectrumKey.G,
+            '~' => SpectrumKey.A,
+            '|' => SpectrumKey.S,
+            '\\' => SpectrumKey.D,
+            '©' => SpectrumKey.P,
+            _ => null,
+        };
+
+        key = extended.GetValueOrDefault();
+        return extended is not null;
+    }
+
+    /// <summary>The strokes that type <paramref name="c"/> in extended mode, for <see cref="AutoTyper"/>; null if it is not such a character.</summary>
+    public static SpectrumKey[][]? ExtendedStrokes(char c) => TryGetExtendedKey(c, out var key)
+        ? [[SpectrumKey.CapsShift, SpectrumKey.SymbolShift], [SpectrumKey.SymbolShift, key]]
+        : null;
 
     private static SpectrumKey Letter(int index) => index switch
     {

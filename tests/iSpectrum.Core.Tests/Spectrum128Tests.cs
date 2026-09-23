@@ -64,6 +64,34 @@ public class Spectrum128Tests
         Assert.True(OnScreen(spectrum, "HI "), string.Join('\n', Enumerable.Range(0, 24).Select(row => ScreenText.ReadRow(spectrum, row))));
     }
 
+    [Fact]
+    public void Basic128Editor_TakesExtendedModeCharacters()
+    {
+        var spectrum = TestMachine.New128();
+
+        // Menu: cursor down to "128 BASIC", ENTER; then PRINT "[|]", keywords spelt out.
+        spectrum.RunFrames(BootFrames);
+        spectrum.Type(SpectrumKey.CapsShift, SpectrumKey.D6);
+        spectrum.Type(SpectrumKey.Enter);
+        spectrum.RunFrames(50);
+        spectrum.TypeText("print \"");
+        foreach (var c in "[|]")
+        {
+            spectrum.AutoTyper.Append(SpectrumCharacters.ExtendedStrokes(c)!);
+        }
+
+        while (spectrum.AutoTyper.IsBusy)
+        {
+            spectrum.RunFrame();
+        }
+
+        spectrum.TypeText("\"");
+        spectrum.Type(SpectrumKey.Enter);
+        spectrum.RunFrames(20);
+
+        Assert.True(OnScreen(spectrum, "[|] "), string.Join('\n', Enumerable.Range(0, 24).Select(row => ScreenText.ReadRow(spectrum, row))));
+    }
+
     private static bool OnScreen(Spectrum128 spectrum, string start)
     {
         for (var row = 0; row < 24; row++)

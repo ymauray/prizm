@@ -15,7 +15,8 @@ namespace iSpectrum.App;
 /// for as long as that host key stays down. Shift alone is Caps Shift and Control alone is Symbol
 /// Shift, as games expect. While Control is down, letters and digits map by position instead
 /// (Raylib names keys after US QWERTY, the Spectrum's layout), so every raw combination stays
-/// reachable. Option is left to the host, which uses it to type characters.
+/// reachable. Option is left to the host, which uses it to type characters. The symbols typed in
+/// extended mode ([ ] { } ~ | \ ©) take two strokes, which the machine's auto-typer plays.
 ///
 /// Host events must be read on every redraw, because Raylib drops them at the next one, while
 /// the machine may run zero, one or several frames per redraw. A translated character or special
@@ -77,8 +78,11 @@ internal sealed class KeyboardInput
 
     private int _heldCount;
 
-    /// <summary>Reads the host events of this redraw and sets the Spectrum matrix accordingly.</summary>
-    public void Update(Keyboard keyboard)
+    /// <summary>
+    /// Reads the host events of this redraw and sets the Spectrum matrix accordingly; characters
+    /// that take more than one stroke go to <paramref name="typer"/>.
+    /// </summary>
+    public void Update(Keyboard keyboard, AutoTyper typer)
     {
         ReleaseKeys();
         var pressedCount = ReadPressedKeys();
@@ -89,7 +93,7 @@ internal sealed class KeyboardInput
         // Command shortcuts belong to macOS; with Control, keys map by position instead.
         if (!control && !command)
         {
-            HoldCharacters(pressedCount, characterCount);
+            HoldCharacters(pressedCount, characterCount, typer);
         }
 
         keyboard.ReleaseAll();
@@ -108,9 +112,10 @@ internal sealed class KeyboardInput
                 }
             }
         }
-        else if (hostShift && !HoldsCharacter())
+        else if (hostShift && !HoldsCharacter() && !typer.IsBusy)
         {
-            // Shift alone is Caps Shift; while it types a character (Shift+2 = "), it is not.
+            // Shift alone is Caps Shift; while it types a character (Shift+2 = ", or Option+
+            // Shift+7 = \ on a Swiss keyboard, which the auto-typer types), it is not.
             keyboard.SetKey(SpectrumKey.CapsShift, true);
         }
 
@@ -213,14 +218,23 @@ internal sealed class KeyboardInput
     /// dead key (^ on a Swiss keyboard) is pressed without typing anything, and key repeat types
     /// characters without a new press, so the two lists do not always line up from the start.
     /// </summary>
-    private void HoldCharacters(int pressedCount, int characterCount)
+    private void HoldCharacters(int pressedCount, int characterCount, AutoTyper typer)
     {
         for (int c = characterCount - 1, k = pressedCount - 1; c >= 0 && k >= 0; c--, k--)
         {
-            if (_characters[c] <= char.MaxValue
-                && SpectrumCharacters.TryGetKeys((char)_characters[c], out var key, out var shift))
+            if (_characters[c] > char.MaxValue)
+            {
+                continue;
+            }
+
+            var character = (char)_characters[c];
+            if (SpectrumCharacters.TryGetKeys(character, out var key, out var shift))
             {
                 Hold(_pressed[k], key, shift);
+            }
+            else if (SpectrumCharacters.ExtendedStrokes(character) is { } strokes)
+            {
+                typer.Append(strokes);
             }
         }
     }

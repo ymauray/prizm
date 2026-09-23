@@ -43,4 +43,26 @@ public class BootTests
 
         Assert.StartsWith("A+B=C ", ScreenText.ReadRow(spectrum.Memory.Contents, 0));
     }
+
+    [Fact]
+    public void Rom_PrintsExtendedModeCharacters_TypedInTwoStrokes()
+    {
+        var spectrum = TestMachine.Boot();
+        spectrum.TypeText("p\"");
+
+        foreach (var c in "[]{}~|\\©")
+        {
+            spectrum.AutoTyper.Append(SpectrumCharacters.ExtendedStrokes(c)!);
+        }
+
+        while (spectrum.AutoTyper.IsBusy)
+        {
+            spectrum.RunFrame();
+        }
+
+        spectrum.TypeText("\"");
+        spectrum.Type(SpectrumKey.Enter);
+
+        Assert.StartsWith("[]{}~|\\© ", ScreenText.ReadRow(spectrum.Memory.Contents, 0));
+    }
 }
