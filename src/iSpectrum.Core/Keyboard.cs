@@ -5,12 +5,16 @@ namespace iSpectrum.Core;
 
 /// <summary>
 /// The 8 x 5 key matrix. The front-end sets which keys are down; the ULA reads the matrix
-/// when the CPU reads port 0xFE.
+/// when the CPU reads port 0xFE. Keys typed by <see cref="AutoTyper"/> live in a layer of their
+/// own, so that neither side releases the other's keys.
 /// </summary>
 public sealed class Keyboard
 {
     /// <summary>Per half-row, one bit per key held down (bit set = pressed).</summary>
     private readonly byte[] _rows = new byte[8];
+
+    /// <summary>The same, for the keys typed automatically.</summary>
+    private readonly byte[] _typedRows = new byte[8];
 
     public void SetKey(SpectrumKey key, bool pressed)
     {
@@ -29,6 +33,10 @@ public sealed class Keyboard
 
     public void ReleaseAll() => Array.Clear(_rows);
 
+    internal void PressTyped(SpectrumKey key) => _typedRows[(int)key >> 3] |= (byte)(1 << ((int)key & 7));
+
+    internal void ReleaseTyped() => Array.Clear(_typedRows);
+
     /// <summary>
     /// Bits 0-4 of a port 0xFE read, active low. Each address line A8-A15 held low selects one
     /// half-row; when several are selected, a key pressed in any of them pulls its bit low.
@@ -40,7 +48,7 @@ public sealed class Keyboard
         {
             if ((addressHigh & (1 << row)) == 0)
             {
-                pressed |= _rows[row];
+                pressed |= _rows[row] | _typedRows[row];
             }
         }
 

@@ -118,6 +118,23 @@ public class TapeLoadingTests
         Assert.StartsWith("R Tape loading error", ScreenText.ReadRow(spectrum.Memory.Contents, 23));
     }
 
+    [Fact]
+    public void AutoTyper_TypesLoadAfterBoot_WhileTheUserTypesNothing()
+    {
+        var spectrum = new Spectrum48(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "roms", "48.rom")))
+        {
+            FastLoad = true,
+        };
+        spectrum.Tape.Insert(TapeBuilder.HelloProgram());
+
+        spectrum.AutoTyper.Start(AutoTyper.LoadCommand, Spectrum48.BootFrames);
+        spectrum.Keyboard.ReleaseAll(); // the front-end clearing its own keys must not stop the typing
+        spectrum.RunFrames(Spectrum48.BootFrames + 50);
+
+        Assert.False(spectrum.AutoTyper.IsBusy);
+        Assert.True(FindRow(spectrum, "HI ") > 0);
+    }
+
     private static int FindRow(Spectrum48 spectrum, string start)
     {
         for (var row = 0; row < 24; row++)

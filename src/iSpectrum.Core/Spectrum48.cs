@@ -46,6 +46,15 @@ public sealed class Spectrum48
     /// <summary>The tape deck. It starts playing when the ROM starts loading.</summary>
     public TapePlayer Tape => Ula.Tape;
 
+    /// <summary>Types key strokes on this machine, one frame at a time.</summary>
+    public AutoTyper AutoTyper { get; } = new();
+
+    /// <summary>
+    /// Frames to wait after power-on before typing: the ROM needs about 85 to test the RAM and
+    /// show its copyright message.
+    /// </summary>
+    public const int BootFrames = 100;
+
     /// <summary>
     /// When set, LD-BYTES is intercepted and each block is copied straight into memory instead of
     /// being played; when clear, the ROM reads the tape signal in real time.
@@ -67,6 +76,7 @@ public sealed class Spectrum48
     {
         var interruptTaken = false;
         Ula.Beeper.StartFrame();
+        AutoTyper.NextFrame(Keyboard);
 
         while (Cpu.TStates < FrameTStates)
         {
