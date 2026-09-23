@@ -13,6 +13,26 @@ les règles de contribution (y compris pour les agents de code) dans [`AGENTS.md
 dotnet run --project src/iSpectrum.App
 ```
 
+## Clavier
+
+Les caractères sont traduits : tapez-les comme d'habitude sur votre clavier (`"`, `+`, `:`…),
+quelle que soit sa disposition, et l'émulateur appuie sur les touches Spectrum qui les donnent.
+
+| Mac | Spectrum |
+|---|---|
+| Maj seule | Caps Shift |
+| Ctrl seul | Symbol Shift |
+| Ctrl + touche | combinaison brute, touches lues par position (QWERTY) |
+| Entrée | ENTER |
+| Retour arrière | DELETE |
+| Échap | BREAK |
+| Flèches | curseurs |
+| Tab | mode étendu (Caps Shift + Symbol Shift) |
+| F1 … F9 | Caps Shift + 1 … 9 (F1 EDIT, F2 CAPS LOCK, F9 GRAPHICS) |
+
+Les caractères du mode étendu (`[ ] { } ~ | \ ©`) se tapent comme sur le Spectrum : Tab, puis
+Ctrl + la touche. Pour quitter, fermez la fenêtre.
+
 ## Tester
 
 ```sh

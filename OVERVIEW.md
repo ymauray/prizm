@@ -25,11 +25,12 @@ Ce qui existe :
   `SpectrumKey` (matrice 8 demi-rangées × 5 touches), `Spectrum48` (frame de 69 888 T-states,
   interruption tant que INT est maintenue), `ScreenLayout`, `Palette`.
 - `src/iSpectrum.App` : fenêtre Raylib-cs 960×768 (image ×3, sans filtrage), 50 images/s ;
-  `KeyMap` traduit le clavier du Mac en matrice Spectrum à chaque frame.
+  `KeyboardInput` traduit le clavier du Mac en matrice Spectrum à chaque frame.
+- `SpectrumCharacters` (Core) : quelles touches Spectrum tapent un caractère donné.
 - Tests : suite FUSE (1356 tests), ZEXDOC et ZEXALL (catégorie `Slow`), interruptions,
   adressage écran, attributs, bordure, protection de la ROM, matrice clavier, et deux tests sur
   la vraie ROM qui relisent l'écran en comparant chaque case à la police de la ROM : le message
-  de copyright au démarrage, puis `PRINT 2+2` tapé au clavier, qui affiche `4`.
+  de copyright au démarrage, puis `PRINT 2+2` et `PRINT "A+B=C"` tapés au clavier.
 
 Choix de comportement déjà faits (détaillés en commentaire dans le code) :
 
@@ -48,9 +49,13 @@ Choix de comportement déjà faits (détaillés en commentaire dans le code) :
 - Palette : 0xD7 par composante pour les couleurs normales, 0xFF pour les couleurs vives.
 - Port `0xFE` en lecture : bits 0-4 = demi-rangées choisies par les lignes A8-A15 à 0 ; bits
   5 et 7 à 1 ; bit 6 (EAR) à 1 tant que l'entrée cassette n'existe pas.
-- Clavier du Mac lu **par position** (Raylib nomme les touches d'après le QWERTY américain, qui
-  est aussi la disposition du Spectrum). Shift = Caps Shift ; Ctrl et Option = Symbol Shift ;
-  Retour arrière = DELETE ; Échap = BREAK (il ne ferme plus la fenêtre) ; flèches = curseurs.
+- Clavier du Mac **traduit par caractère**, quelle que soit la disposition : le système dit
+  quel caractère une touche a tapé (`"` = Maj+2 sur un clavier suisse), et l'App tient
+  enfoncées les touches Spectrum correspondantes (Symbol Shift + P) tant que la touche du Mac
+  l'est. Maj seule = Caps Shift ; Ctrl seul = Symbol Shift ; avec Ctrl enfoncé, les touches
+  sont lues par position (Raylib nomme les touches d'après le QWERTY américain, qui est aussi
+  la disposition du Spectrum). Option est laissée au système (elle tape `@`, `#`…). Touches
+  spéciales : voir `README.md`.
 - La RAM démarre à zéro.
 
 Reste en suspens :
@@ -59,8 +64,9 @@ Reste en suspens :
   Il faudra horodater chaque accès, ce qui ira avec la contention (jalon 7).
 - NMI non implémentée (inutile sur un Spectrum sans interface).
 - Cadence réglée par `SetTargetFPS(50)` ; elle devra se caler sur l'audio au jalon 5.
-- Sur un clavier QWERTZ (suisse, allemand), Y et Z sont inversés ; sur AZERTY, A/Q, Z/W et M
-  aussi. Solution envisagée : faire suivre l'étiquette des touches pour les lettres (via GLFW).
+- Les caractères du mode étendu (`[ ] { } ~ | \ ©`) ne sont pas traduits : il faudrait
+  enchaîner deux combinaisons. Les touches mortes (`^`, `¨`) et la frappe très rapide n'ont été
+  essayées qu'à la main.
 - Pas encore de fenêtre « À propos » : le copyright Amstrad n'est mentionné que dans
   `README.md` et `roms/README.md`.
 
