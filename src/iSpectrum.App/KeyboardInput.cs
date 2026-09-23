@@ -16,6 +16,11 @@ namespace iSpectrum.App;
 /// Shift, as games expect. While Control is down, letters and digits map by position instead
 /// (Raylib names keys after US QWERTY, the Spectrum's layout), so every raw combination stays
 /// reachable. Option is left to the host, which uses it to type characters.
+///
+/// Host events must be read on every redraw, because Raylib drops them at the next one, while
+/// the machine may run zero, one or several frames per redraw. A translated character or special
+/// key therefore stays pressed until its host key is up <em>and</em> at least one frame has run
+/// with it, so that even a quick tap reaches the Spectrum.
 /// </remarks>
 internal sealed class KeyboardInput
 {
@@ -66,21 +71,20 @@ internal sealed class KeyboardInput
     private readonly KeyboardKey[] _pressed = new KeyboardKey[MaxEvents];
     private readonly int[] _characters = new int[MaxEvents];
 
-    /// <summary>Translated characters, held while the host key that typed them is down.</summary>
-    private readonly (KeyboardKey Host, SpectrumKey Key, SpectrumKey? Shift)[] _held =
-        new (KeyboardKey, SpectrumKey, SpectrumKey?)[MaxHeld];
+    /// <summary>Translated characters and special keys, held while their host key is down.</summary>
+    private readonly (KeyboardKey Host, SpectrumKey Key, SpectrumKey? Shift, bool Seen)[] _held =
+        new (KeyboardKey, SpectrumKey, SpectrumKey?, bool)[MaxHeld];
 
     private int _heldCount;
 
-    /// <summary>Reads this frame's host events and sets the Spectrum matrix accordingly.</summary>
+    /// <summary>Reads the host events of this redraw and sets the Spectrum matrix accordingly.</summary>
     public void Update(Keyboard keyboard)
     {
+        ReleaseKeys();
         var pressedCount = ReadPressedKeys();
         var characterCount = ReadCharacters();
         var control = IsDown(KeyboardKey.LeftControl) || IsDown(KeyboardKey.RightControl);
         var command = IsDown(KeyboardKey.LeftSuper) || IsDown(KeyboardKey.RightSuper);
-
-        ReleaseCharacters();
 
         // Command shortcuts belong to macOS; with Control, keys map by position instead.
         if (!control && !command)
@@ -89,14 +93,6 @@ internal sealed class KeyboardInput
         }
 
         keyboard.ReleaseAll();
-
-        foreach (var (host, key, shift) in SpecialKeys)
-        {
-            if (IsDown(host))
-            {
-                Press(keyboard, key, shift);
-            }
-        }
 
         var hostShift = IsDown(KeyboardKey.LeftShift) || IsDown(KeyboardKey.RightShift);
 
@@ -112,7 +108,7 @@ internal sealed class KeyboardInput
                 }
             }
         }
-        else if (hostShift && _heldCount == 0)
+        else if (hostShift && !HoldsCharacter())
         {
             // Shift alone is Caps Shift; while it types a character (Shift+2 = "), it is not.
             keyboard.SetKey(SpectrumKey.CapsShift, true);
@@ -124,14 +120,35 @@ internal sealed class KeyboardInput
         }
     }
 
-    /// <summary>Keys pressed this frame that may type a character (not modifiers, not special keys).</summary>
+    /// <summary>Marks the keys held so far as seen by the machine; called after each frame.</summary>
+    public void FrameRan()
+    {
+        for (var i = 0; i < _heldCount; i++)
+        {
+            _held[i].Seen = true;
+        }
+    }
+
+    /// <summary>
+    /// Holds the special keys pressed during this redraw, and returns the other keys pressed, which
+    /// may have typed a character (modifiers excluded).
+    /// </summary>
     private int ReadPressedKeys()
     {
         var count = 0;
         for (var code = Raylib.GetKeyPressed(); code != 0; code = Raylib.GetKeyPressed())
         {
             var key = (KeyboardKey)code;
-            if (count < MaxEvents && !IsModifier(key) && !IsSpecial(key))
+            if (IsModifier(key))
+            {
+                continue;
+            }
+
+            if (FindSpecial(key) is { } special)
+            {
+                Hold(key, special.Key, special.Shift);
+            }
+            else if (count < MaxEvents)
             {
                 _pressed[count++] = key;
             }
@@ -154,13 +171,13 @@ internal sealed class KeyboardInput
         return count;
     }
 
-    /// <summary>Forgets the characters whose host key has been released.</summary>
-    private void ReleaseCharacters()
+    /// <summary>Forgets the keys whose host key is up and that a frame has already seen.</summary>
+    private void ReleaseKeys()
     {
         var kept = 0;
         for (var i = 0; i < _heldCount; i++)
         {
-            if (IsDown(_held[i].Host))
+            if (IsDown(_held[i].Host) || !_held[i].Seen)
             {
                 _held[kept++] = _held[i];
             }
@@ -169,21 +186,41 @@ internal sealed class KeyboardInput
         _heldCount = kept;
     }
 
+    private void Hold(KeyboardKey host, SpectrumKey key, SpectrumKey? shift)
+    {
+        if (_heldCount < MaxHeld)
+        {
+            _held[_heldCount++] = (host, key, shift, false);
+        }
+    }
+
+    /// <summary>Whether a translated character (not a special key) is held.</summary>
+    private bool HoldsCharacter()
+    {
+        for (var i = 0; i < _heldCount; i++)
+        {
+            if (FindSpecial(_held[i].Host) is null)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     /// <summary>
     /// Pairs each new character with the key that typed it, from the most recent backwards: a
     /// dead key (^ on a Swiss keyboard) is pressed without typing anything, and key repeat types
     /// characters without a new press, so the two lists do not always line up from the start.
-    /// A character is held for at least this frame, even if its key is already up again.
     /// </summary>
     private void HoldCharacters(int pressedCount, int characterCount)
     {
         for (int c = characterCount - 1, k = pressedCount - 1; c >= 0 && k >= 0; c--, k--)
         {
             if (_characters[c] <= char.MaxValue
-                && SpectrumCharacters.TryGetKeys((char)_characters[c], out var key, out var shift)
-                && _heldCount < MaxHeld)
+                && SpectrumCharacters.TryGetKeys((char)_characters[c], out var key, out var shift))
             {
-                _held[_heldCount++] = (_pressed[k], key, shift);
+                Hold(_pressed[k], key, shift);
             }
         }
     }
@@ -203,16 +240,16 @@ internal sealed class KeyboardInput
         or KeyboardKey.LeftControl or KeyboardKey.RightControl or KeyboardKey.LeftAlt or KeyboardKey.RightAlt
         or KeyboardKey.LeftSuper or KeyboardKey.RightSuper or KeyboardKey.CapsLock;
 
-    private static bool IsSpecial(KeyboardKey key)
+    private static (SpectrumKey Key, SpectrumKey? Shift)? FindSpecial(KeyboardKey host)
     {
-        foreach (var special in SpecialKeys)
+        foreach (var (specialHost, key, shift) in SpecialKeys)
         {
-            if (special.Host == key)
+            if (specialHost == host)
             {
-                return true;
+                return (key, shift);
             }
         }
 
-        return false;
+        return null;
     }
 }

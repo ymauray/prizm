@@ -9,6 +9,11 @@ using Raylib_cs;
 
 const int Scale = 3;
 const int FramesPerSecond = 50;
+
+// With sound, the loop redraws at the display's refresh rate (capped here) and runs as many
+// frames as the audio needs; this caps the catch-up after a stall, such as a window drag.
+const int MaxRedrawsPerSecond = 120;
+const int MaxFramesPerRedraw = 4;
 const string Title = "iSpectrum";
 
 var rom = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "roms", "48.rom"));
@@ -18,8 +23,11 @@ var fileChooser = new FileChooser();
 var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 var snapshotFolder = Path.Combine(documents, "iSpectrum");
 
+Raylib.SetConfigFlags(ConfigFlags.VSyncHint);
 Raylib.InitWindow(Ula.FrameWidth * Scale, Ula.FrameHeight * Scale, Title);
-Raylib.SetTargetFPS(FramesPerSecond);
+
+using var audio = new AudioOutput();
+Raylib.SetTargetFPS(audio.IsReady ? MaxRedrawsPerSecond : FramesPerSecond);
 
 // Escape is the Spectrum's BREAK, not a way to quit: close the window to quit.
 Raylib.SetExitKey(KeyboardKey.Null);
@@ -75,8 +83,25 @@ while (!Raylib.WindowShouldClose())
         HostShell.OpenFolder(snapshotFolder);
     }
 
+    // Keyboard events must be read on every redraw: Raylib drops them at the next one.
     keyboardInput.Update(spectrum.Keyboard);
-    spectrum.RunFrame();
+
+    if (audio.IsReady)
+    {
+        // The sound card sets the pace: run frames until enough sound is waiting.
+        for (var frame = 0; frame < MaxFramesPerRedraw && audio.Queued < AudioOutput.TargetQueued; frame++)
+        {
+            RunFrame();
+            audio.Write(spectrum.AudioSamples);
+        }
+
+        audio.Pump();
+    }
+    else
+    {
+        RunFrame();
+    }
+
     Raylib.UpdateTexture(texture, spectrum.FrameBuffer);
 
     Raylib.BeginDrawing();
@@ -87,6 +112,12 @@ while (!Raylib.WindowShouldClose())
 
 Raylib.UnloadTexture(texture);
 Raylib.CloseWindow();
+
+void RunFrame()
+{
+    spectrum.RunFrame();
+    keyboardInput.FrameRan();
+}
 
 // Loads into a fresh machine first, so that a bad file leaves the running one untouched.
 void LoadSnapshot(string path)
