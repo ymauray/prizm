@@ -5,8 +5,11 @@
 ;
 ;   sjasmplus --sym=hello.sym examples/hello.asm
 ;
-; writes hello.tap (loadable in iSpectrum) and hello.sym (its symbols, which iSpectrum's
-; debugger reads when it opens hello.tap) in the current folder.
+; writes, in the current folder:
+;   hello.sna  a snapshot, to develop with: it loads at once and starts at `start`;
+;   hello.tap  a tape, to share: it loads as in 1983 (slowly: most of the RAM is saved);
+;   hello.sym  the symbols, which iSpectrum's debugger reads when it opens hello.sna or
+;              hello.tap from the same folder.
 
         DEVICE ZXSPECTRUM48
         ORG $8000
@@ -31,4 +34,5 @@ start:
 message:
         db "Hello from sjasmplus!",13,0
 
+        SAVESNA "hello.sna",start
         SAVETAP "hello.tap",start
