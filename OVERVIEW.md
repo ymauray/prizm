@@ -11,10 +11,11 @@ GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
 
 ## 0. État d'avancement
 
-**Jalons 1 à 5 terminés** (tags Git `jalon-1` à `jalon-5`) : le Spectrum 48K démarre la ROM
-d'origine dans une fenêtre, on y tape du BASIC au clavier du Mac, il charge et sauvegarde des
-snapshots, et le beeper se fait entendre. Un vrai jeu de 1983 (*Miner*, de David Hembrow,
-librement redistribuable) se joue avec le son. Il n'y a pas encore de chargement de cassettes.
+**Jalons 1 à 6 terminés** (tags Git `jalon-1` à `jalon-6`) : le Spectrum 48K démarre la ROM
+d'origine dans une fenêtre, on y tape du BASIC au clavier du Mac, le beeper se fait entendre, il
+charge et sauvegarde des snapshots, et il charge des cassettes `.TAP` en temps réel (son et
+bandes de couleur dans la bordure) ou instantanément. Deux jeux librement redistribuables de
+David Hembrow tournent : *Miner* (1983, `.z80`) et *Corona-V* (2020, `.tap`).
 
 Ce qui existe :
 
@@ -24,17 +25,22 @@ Ce qui existe :
 - `src/iSpectrum.Core` : `Memory48K` (ROM protégée en écriture), `Ula` (port `0xFE` : clavier
   en lecture, bordure et haut-parleur en écriture ; rendu de l'écran avec BRIGHT et FLASH), `Keyboard` et
   `SpectrumKey` (matrice 8 demi-rangées × 5 touches), `Beeper` (échantillons audio de chaque
-  frame), `Spectrum48` (frame de 69 888 T-states,
+  frame, haut-parleur et signal de cassette mélangés), `AutoTyper` (frappe de touches
+  programmée, par exemple `LOAD ""`), `Spectrum48` (frame de 69 888 T-states,
   interruption tant que INT est maintenue), `ScreenLayout`, `Palette`.
 - `src/iSpectrum.App` : fenêtre Raylib-cs 960×768 (image ×3, sans filtrage) ; `KeyboardInput`
   traduit le clavier du Mac en matrice Spectrum ; `AudioOutput` joue le beeper et donne la
   cadence de l'émulation.
 - `SpectrumCharacters` (Core) : quelles touches Spectrum tapent un caractère donné.
+- `src/iSpectrum.Core/Tape` : `TapFile` (blocs d'un `.TAP`), `TapePlayer` (signal de cassette
+  sur l'entrée EAR).
 - `src/iSpectrum.Core/Snapshots` : `SnaFormat` (chargement et sauvegarde `.SNA` 48K),
   `Z80Format` (chargement `.Z80` versions 1 à 3, 48K), `Snapshot` (choix d'après l'extension).
-- App : chargement en argument, par glisser-déposer ou Cmd+O (sélecteur natif via `osascript`,
-  `zenity` sous Linux) ; Cmd+S sauvegarde un `.SNA` dans `~/Documents/iSpectrum`, Cmd+F ouvre
-  ce dossier. Messages dans le titre de la fenêtre (pas encore de texte à l'écran).
+- App : ouverture de snapshots et de cassettes en argument, par glisser-déposer ou Cmd+O
+  (sélecteur natif via `osascript`, `zenity` sous Linux) ; Cmd+S sauvegarde un `.SNA` dans
+  `~/Documents/iSpectrum`, Cmd+F ouvre ce dossier ; Cmd+L bascule chargement réel / rapide,
+  Cmd+T le turbo pendant un chargement. Messages dans le titre de la fenêtre (pas encore de
+  texte à l'écran).
 - Tests : suite FUSE (1356 tests), ZEXDOC et ZEXALL (catégorie `Slow`), interruptions,
   adressage écran, attributs, bordure, protection de la ROM, matrice clavier, et deux tests sur
   la vraie ROM qui relisent l'écran en comparant chaque case à la police de la ROM : le message
@@ -44,6 +50,11 @@ Ce qui existe :
   sauvegardé puis rechargé dans une machine neuve pour chaque format.
 - Beeper : silence, nombre d'échantillons sur 50 frames, moyenne dans un échantillon, et
   `BEEP 1,0` joué par la vraie ROM, dont la hauteur (do, 261,6 Hz) est vérifiée.
+- Bordure : un changement de couleur apparaît à la position du faisceau où il a eu lieu.
+- Cassette : instant exact de chaque front du signal ; la vraie ROM charge par `LOAD ""` un
+  programme BASIC depuis le signal (bandes rouge/cyan et son du ton pilote vérifiés) ; le
+  chargement rapide charge le même programme, saute un bloc au mauvais drapeau et affiche
+  `R Tape loading error` sur une somme de contrôle fausse ; la frappe automatique de `LOAD ""`.
 
 Choix de comportement déjà faits (détaillés en commentaire dans le code) :
 
@@ -83,6 +94,19 @@ Choix de comportement déjà faits (détaillés en commentaire dans le code) :
   environ 90 ms de latence). Sans périphérique audio, repli sur 50 images/s.
 - Clavier : les événements sont lus à chaque passage de la boucle (Raylib les efface au
   suivant), et une touche traduite ou spéciale reste enfoncée jusqu'à ce qu'une frame l'ait vue.
+- Bordure dessinée d'après le faisceau : changements horodatés, premier pixel de l'écran à
+  14 336 T-states, 224 T-states par ligne, 2 pixels par T-state. Approximation : l'ULA réelle
+  ne change la bordure que par paquets de 8 pixels, et quelques T-states de décalage sont à
+  caler au jalon 7. La zone d'écran reste dessinée d'un bloc en fin de frame.
+- Cassette réelle : durées de la ROM (pilote 2168 T × 8063 avant un en-tête, × 3223 avant des
+  données ; synchronisation 667 + 735 ; bit 0 = 2 × 855, bit 1 = 2 × 1710 ; pause de 1 s).
+  Signal lu sur le bit 6 du port `0xFE` et mélangé au son à mi-volume. La cassette démarre
+  quand la ROM entre dans `LD-BYTES` (`0x0556`) et joue jusqu'au bout.
+- Chargement rapide : interception à `LD-BREAK` (`0x056B`), copie du bloc en IX, puis saut à la
+  fin de `LD-BYTES` (`0x05DF`) avec H = XOR de tous les octets, comme FUSE ; la ROM décide
+  elle-même du succès et gère les erreurs.
+- Une cassette ouverte dans l'App redémarre une machine neuve, qui tape `LOAD ""` après 100
+  frames. Par défaut : chargement réel ; le turbo tourne sans son, pendant 12 ms par affichage.
 - L'App charge un snapshot dans une machine neuve et ne remplace la machine en cours qu'en cas
   de succès : un fichier invalide ne laisse jamais une machine à moitié chargée.
 
@@ -98,9 +122,9 @@ Reste en suspens :
 - Pas encore de fenêtre « À propos » : le copyright Amstrad n'est mentionné que dans
   `README.md` et `roms/README.md`.
 
-**Prochaine étape : jalon 6** — cassettes `.TAP` en chargement rapide : interception de la
-routine ROM `LD-BYTES` (`0x0556`) pour injecter les blocs directement, tests du chargeur ;
-ouverture des `.tap` dans l'App (glisser-déposer, Cmd+O) suivie de `LOAD ""`.
+**Prochaine étape : jalon 7** — contention mémoire (l'ULA retarde le CPU quand il accède à la
+RAM d'écran ou au port `0xFE` pendant l'affichage), rendu de la zone d'écran ligne par ligne,
+calage fin de la bordure ; c'est aussi le moment de comparer les événements de bus de FUSE.
 
 ---
 
@@ -128,13 +152,13 @@ iSpectrum/
 ├── iSpectrum.sln
 ├── src/
 │   ├── iSpectrum.Z80/        # CPU Z80 pur, sans dépendance (IMemory, IIo)
-│   ├── iSpectrum.Core/       # Machine : mémoire, ULA, clavier, son, frame, snapshots (cassettes à venir)
+│   ├── iSpectrum.Core/       # Machine : mémoire, ULA, clavier, son, frame, snapshots, cassettes
 │   └── iSpectrum.App/        # Front-end : fenêtre, rendu, clavier, son, fichiers (Raylib-cs)
 ├── tests/
 │   ├── iSpectrum.Z80.Tests/
 │   │   ├── Fuse/             # Suite FUSE + parseur et runner (provenance dans README.md)
 │   │   └── Zex/              # ZEXDOC/ZEXALL + harnais CP/M (provenance dans README.md)
-│   └── iSpectrum.Core.Tests/ # Écran, attributs, mémoire, clavier, son, ROM, SNA/Z80 (TAP à venir)
+│   └── iSpectrum.Core.Tests/ # Écran, attributs, mémoire, clavier, son, ROM, SNA/Z80, TAP
 ├── local/                    # Ignoré par Git : fichiers de test personnels (jeux…)
 ├── README.md
 └── roms/
@@ -259,7 +283,7 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 
 1. **`.SNA`** — snapshot brut (registres + RAM). Le plus simple, idéal pour tester des jeux vite.
 2. **`.Z80`** — snapshot compressé (versions 1, 2 et 3), le format le plus répandu.
-3. **`.TAP`** — interception de la routine ROM `LD-BYTES` (`0x0556`) et injection directe des blocs (« flash loading »).
+3. **`.TAP`** — signal de cassette reconstitué et lu par la ROM (temps réel, avec son et bandes), ou interception de la routine ROM `LD-BYTES` (`0x0556`) et injection directe des blocs (« flash loading »).
 4. **`.TZX`** — émulation réelle du signal cassette, nécessaire pour les chargeurs protégés/turbo.
 
 ---
@@ -289,11 +313,11 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 | 3 | Clavier | On peut taper et exécuter du BASIC — **terminé** (`jalon-3`) |
 | 4 | Chargement `.SNA` / `.Z80` | Les premiers jeux tournent — **terminé** (`jalon-4`) |
 | 5 | Beeper | Le son fonctionne — **terminé** (`jalon-5`) |
-| 6 | `.TAP` (flash loading) | Chargement des cassettes courantes |
-| 7 | Contention mémoire + rendu ligne par ligne | Démos et effets de bordure corrects |
+| 6 | `.TAP` : signal réel et chargement rapide | Chargement des cassettes courantes, avec son et bandes — **terminé** (`jalon-6`) |
+| 7 | Contention mémoire + rendu ligne par ligne | Démos et effets de bordure corrects (la bordure horodatée est faite depuis le jalon 6) |
 | 8 | Modèle 128K | Pagination (port `0x7FFD`) + puce son AY-3-8912 |
 | 9 | Débogueur intégré | Désassembleur, points d'arrêt, vue mémoire/registres |
-| 10 | `.TZX` | Chargeurs protégés / turbo |
+| 10 | `.TZX` | Chargeurs protégés / turbo (le signal de cassette existe depuis le jalon 6) |
 
 ---
 
