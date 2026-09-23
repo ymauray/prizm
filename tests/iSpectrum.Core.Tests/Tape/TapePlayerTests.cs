@@ -102,4 +102,52 @@ public class TapePlayerTests
         Assert.Equal(0xFF, _player.TakeBlock()![0]);
         Assert.Null(_player.TakeBlock());
     }
+
+    [Fact]
+    public void TakeBlock_PassesOverBlocksWithoutSound()
+    {
+        byte[] data = [0xFF, 0x42, 0xBD];
+        _player.Insert(TapeBuilder.Tzx(TapeBuilder.TextBlock("title"), TapeBuilder.PauseBlock(500), TapeBuilder.StandardBlock(data)));
+
+        Assert.Equal(data, _player.TakeBlock());
+        Assert.True(_player.AtEnd);
+    }
+
+    [Fact]
+    public void TakeBlock_LeavesATurboBlockToBePlayed()
+    {
+        _player.Insert(TapeBuilder.Tzx(TapeBuilder.TurboBlock([0xFF, 0x00], 400, 800)));
+
+        Assert.Null(_player.TakeBlock());
+        Assert.Equal(0, _player.CurrentBlock);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void StopIf48KBlock_StopsTheTapeOnA48KOnly(bool is48K)
+    {
+        byte[] stopIf48K = [0x2A, 0, 0, 0, 0];
+        _player.Is48K = is48K;
+        _player.Insert(TapeBuilder.Tzx(stopIf48K, TapeBuilder.StandardBlock([0xFF, 0x00])));
+        _player.Play(0);
+
+        _player.AdvanceTo(10_000, _beeper);
+
+        Assert.Equal(!is48K, _player.IsPlaying);
+        Assert.Equal(1, _player.CurrentBlock);
+    }
+
+    [Fact]
+    public void ATapeThatLoopsWithoutSound_IsStopped()
+    {
+        // A jump back to the text block before it: round and round, without a sound.
+        byte[] jumpBack = [0x23, 0xFF, 0xFF];
+        _player.Insert(TapeBuilder.Tzx(TapeBuilder.TextBlock("again"), jumpBack));
+        _player.Play(0);
+
+        _player.AdvanceTo(0, _beeper);
+
+        Assert.False(_player.IsPlaying);
+    }
 }
