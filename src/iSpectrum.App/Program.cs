@@ -38,6 +38,10 @@ var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments)
 var snapshotFolder = Path.Combine(documents, "iSpectrum");
 var turboTimer = new Stopwatch();
 
+// The .TAP file that SAVE appends to, like a cassette left in record; the first block saved
+// creates it in the snapshot folder, and Tape > New recording starts another.
+string? recordingPath = null;
+
 // Tapes load in real time, with their sound and stripes, unless fast loading is on (Cmd+L);
 // turbo (Cmd+T) runs real-time loading as fast as the Mac can.
 var fastLoad = false;
@@ -86,7 +90,7 @@ var menuBar = new MenuBar(
         new MenuItem("Open...", KeyboardKey.O, ChooseFile),
         new MenuItem("Reload", KeyboardKey.R, Reload, Shift: true),
         new MenuItem("Save snapshot", KeyboardKey.S, SaveSnapshot),
-        new MenuItem("Show snapshot folder", KeyboardKey.F, () => HostShell.OpenFolder(snapshotFolder)),
+        new MenuItem("Show saved files", KeyboardKey.F, () => HostShell.OpenFolder(snapshotFolder)),
         MenuItem.Separator,
         new MenuItem("Quit", KeyboardKey.Q, () => quit = true),
     ]),
@@ -102,6 +106,7 @@ var menuBar = new MenuBar(
         new MenuItem("Insert tape...", KeyboardKey.O, ChooseTape, Shift: true),
         new MenuItem("Play / Stop", KeyboardKey.P, PlayOrStopTape, () => spectrum.Tape.IsPlaying, Shift: true),
         new MenuItem("Rewind", KeyboardKey.Null, RewindTape),
+        new MenuItem("New recording", KeyboardKey.Null, NewRecording),
         MenuItem.Separator,
         new MenuItem("Fast loading", KeyboardKey.L, ToggleFastLoad, () => fastLoad),
         new MenuItem("Turbo while loading", KeyboardKey.T, ToggleTurbo, () => turbo),
@@ -205,6 +210,7 @@ while (!Raylib.WindowShouldClose() && !quit)
     }
 
     ShowTapeProgress();
+    WriteSavedBlocks();
 
     // Stopped in the middle of a frame, the machine shows its memory as it is now, so that each
     // step that writes to the screen can be seen.
@@ -495,6 +501,64 @@ void SaveSnapshot()
         Report($"cannot save: {e.Message}");
     }
 }
+
+// Appends what the ROM has saved to the recording, creating it at the first block.
+void WriteSavedBlocks()
+{
+    while (spectrum.Recorder.TryTake(out var block))
+    {
+        try
+        {
+            Directory.CreateDirectory(snapshotFolder);
+            recordingPath ??= NewRecordingPath(block);
+            using (var file = new FileStream(recordingPath, FileMode.Append))
+            {
+                TapFile.WriteBlock(file, block);
+            }
+
+            var name = HeaderName(block);
+            Report(name is null
+                ? $"saved to {Path.GetFileName(recordingPath)}"
+                : $"saving \"{name}\" to {Path.GetFileName(recordingPath)}");
+        }
+        catch (Exception e) when (e is IOException or UnauthorizedAccessException)
+        {
+            Report($"cannot save: {e.Message}");
+        }
+    }
+}
+
+void NewRecording()
+{
+    recordingPath = null;
+    Report("the next SAVE starts a new tape");
+}
+
+// Named after the program saved, or the time when the first block has no header.
+string NewRecordingPath(byte[] firstBlock)
+{
+    var name = HeaderName(firstBlock) is { } header
+        ? string.Concat(header.Split(Path.GetInvalidFileNameChars())).Trim()
+        : "";
+    if (name.Length == 0)
+    {
+        name = $"iSpectrum-{DateTime.Now:yyyyMMdd-HHmmss}";
+    }
+
+    var path = Path.Combine(snapshotFolder, $"{name}.tap");
+    for (var copy = 2; File.Exists(path); copy++)
+    {
+        path = Path.Combine(snapshotFolder, $"{name} {copy}.tap");
+    }
+
+    return path;
+}
+
+// A header is 19 bytes: flag 0x00, type, 10-character name, three words, checksum.
+static string? HeaderName(byte[] block) =>
+    block.Length == 19 && block[0] == 0x00
+        ? System.Text.Encoding.ASCII.GetString(block, 2, 10).TrimEnd()
+        : null;
 
 byte[] ReadRom(string name) => File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "roms", name));
 
