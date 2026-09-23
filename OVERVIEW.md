@@ -144,8 +144,9 @@ Son et App :
 - Mélange dans `Beeper` : haut-parleur (bit 4 du port `0xFE`, MIC ignoré), cassette à mi-volume,
   AY ; chaque échantillon (44 100 Hz, 16 bits mono) est le niveau moyen pendant sa durée, puis
   passe-haut à un pôle. Toutes les sources sont amenées au même T-state avant chaque événement.
-- Cadence donnée par la carte son (tampon de 2048 échantillons, environ 90 ms de latence) ;
-  affichage à la synchronisation verticale ; repli sur 50 images/s sans audio.
+- Cadence donnée par la carte son, qui puise elle-même dans un anneau de 1024 échantillons
+  d'avance (callback Raylib, environ 30 ms de latence) ; affichage à la synchronisation
+  verticale ; repli sur 50 images/s sans audio.
 - Clavier du Mac traduit par caractère (Maj+2 = `"` sur un clavier suisse) ; Maj seule = Caps
   Shift, Ctrl seul = Symbol Shift, Ctrl + touche = par position ; événements lus à chaque
   passage de la boucle, touche tenue jusqu'à ce qu'une frame l'ait vue.
@@ -173,7 +174,6 @@ Son et App :
 
 ### Reste en suspens
 
-- Latence audio d'environ 90 ms, à réduire si elle gêne.
 - Tests visuels de l'ULA (`btime`, `stime`, `ulatest3`) : licence et références à trouver.
 - TZX : pas d'accélération des chargeurs (FUSE raccourcit les boucles des chargeurs qu'il
   reconnaît ; ici, seul le turbo accélère) ; bloc « select » (`0x28`) ignoré ; les blocs CSW et
