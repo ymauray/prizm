@@ -8,6 +8,16 @@ public sealed partial class Z80Cpu
     public void Step()
     {
         var opcode = FetchOpcode();
+        _index = IndexHL;
+
+        // DD and FD only select IX or IY for the next opcode, at the cost of one opcode fetch.
+        // In a chain of prefixes the last one wins; interrupts cannot occur in between.
+        while (opcode is 0xDD or 0xFD)
+        {
+            _index = opcode == 0xDD ? IndexIX : IndexIY;
+            opcode = FetchOpcode();
+        }
+
         var x = opcode >> 6;
         var y = (opcode >> 3) & 7;
         var z = opcode & 7;
@@ -17,7 +27,7 @@ public sealed partial class Z80Cpu
             case 0: ExecuteX0(y, z); break;
             case 1: ExecuteX1(y, z); break;
             case 2: Alu(y, ReadRegisterOrMemory(z)); break;
-            default: ExecuteX3(opcode, y, z); break;
+            default: ExecuteX3(y, z); break;
         }
     }
 
@@ -40,7 +50,7 @@ public sealed partial class Z80Cpu
                 else
                 {
                     Internal(7);
-                    HL = Add16(HL, GetRegisterPair(p));
+                    IndexRegister = Add16(IndexRegister, GetRegisterPair(p));
                 }
 
                 break;
@@ -58,9 +68,10 @@ public sealed partial class Z80Cpu
             case 4:
                 if (y == 6)
                 {
-                    var value = ReadByte(HL);
+                    var address = MemoryOperandAddress();
+                    var value = ReadByte(address);
                     Internal(1);
-                    WriteByte(HL, Inc(value));
+                    WriteByte(address, Inc(value));
                 }
                 else
                 {
@@ -72,9 +83,10 @@ public sealed partial class Z80Cpu
             case 5:
                 if (y == 6)
                 {
-                    var value = ReadByte(HL);
+                    var address = MemoryOperandAddress();
+                    var value = ReadByte(address);
                     Internal(1);
-                    WriteByte(HL, Dec(value));
+                    WriteByte(address, Dec(value));
                 }
                 else
                 {
@@ -84,14 +96,21 @@ public sealed partial class Z80Cpu
                 break;
 
             case 6:
-                var operand = ReadOperand();
-                if (y == 6)
+                if (y != 6)
                 {
-                    WriteByte(HL, operand);
+                    SetRegister(y, ReadOperand());
+                }
+                else if (_index == IndexHL)
+                {
+                    WriteByte(HL, ReadOperand());
                 }
                 else
                 {
-                    SetRegister(y, operand);
+                    // LD (IX+d),n: the displacement and n are read first, then 2 internal T-states.
+                    var address = IndexedAddress(ReadOperand());
+                    var operand = ReadOperand();
+                    Internal(2);
+                    WriteByte(address, operand);
                 }
 
                 break;
@@ -169,13 +188,14 @@ public sealed partial class Z80Cpu
                 address = ReadOperandWord();
                 if (q == 0)
                 {
-                    WriteByte(address, L);
-                    WriteByte((ushort)(address + 1), H);
+                    var value = IndexRegister;
+                    WriteByte(address, (byte)value);
+                    WriteByte((ushort)(address + 1), (byte)(value >> 8));
                 }
                 else
                 {
-                    L = ReadByte(address);
-                    H = ReadByte((ushort)(address + 1));
+                    var low = ReadByte(address);
+                    IndexRegister = (ushort)(low | (ReadByte((ushort)(address + 1)) << 8));
                 }
 
                 WZ = (ushort)(address + 1);
@@ -263,17 +283,22 @@ public sealed partial class Z80Cpu
             return;
         }
 
+        // With a memory operand, H and L stay H and L: LD H,(IX+d) loads H, not IXH.
         if (y == 6)
         {
-            WriteByte(HL, GetRegister(z));
+            WriteByte(MemoryOperandAddress(), GetPlainRegister(z));
+        }
+        else if (z == 6)
+        {
+            SetPlainRegister(y, ReadByte(MemoryOperandAddress()));
         }
         else
         {
-            SetRegister(y, ReadRegisterOrMemory(z));
+            SetRegister(y, GetRegister(z));
         }
     }
 
-    private void ExecuteX3(byte opcode, int y, int z)
+    private void ExecuteX3(int y, int z)
     {
         var p = y >> 1;
         var q = y & 1;
@@ -314,11 +339,11 @@ public sealed partial class Z80Cpu
                             (L, L_) = (L_, L);
                             break;
                         case 2:
-                            PC = HL;
+                            PC = IndexRegister;
                             break;
                         default:
                             Internal(2);
-                            SP = HL;
+                            SP = IndexRegister;
                             break;
                     }
                 }
@@ -362,13 +387,10 @@ public sealed partial class Z80Cpu
                     WZ = address;
                     Call(address);
                 }
-                else if (p == 2)
-                {
-                    ExecuteEd();
-                }
                 else
                 {
-                    throw PrefixNotImplemented(opcode);
+                    // p == 2; the DD and FD slots (p == 1 and 3) are consumed by Step.
+                    ExecuteEd();
                 }
 
                 break;
@@ -398,7 +420,15 @@ public sealed partial class Z80Cpu
                 break;
 
             case 1:
-                ExecuteCb();
+                if (_index == IndexHL)
+                {
+                    ExecuteCb();
+                }
+                else
+                {
+                    ExecuteIndexedCb();
+                }
+
                 break;
 
             case 2:
@@ -421,13 +451,13 @@ public sealed partial class Z80Cpu
             {
                 var low = ReadByte(SP);
                 var high = ReadByte((ushort)(SP + 1));
+                var value = IndexRegister;
                 Internal(1);
-                WriteByte((ushort)(SP + 1), H);
-                WriteByte(SP, L);
+                WriteByte((ushort)(SP + 1), (byte)(value >> 8));
+                WriteByte(SP, (byte)value);
                 Internal(2);
-                H = high;
-                L = low;
-                WZ = HL;
+                IndexRegister = (ushort)(low | (high << 8));
+                WZ = IndexRegister;
                 break;
             }
 
@@ -454,9 +484,6 @@ public sealed partial class Z80Cpu
         PC = address;
     }
 
-    private static NotImplementedException PrefixNotImplemented(byte prefix) =>
-        new($"Prefix 0x{prefix:X2} is not implemented yet.");
-
     /// <summary>Conditions in opcode order: NZ, Z, NC, C, PO, PE, P, M.</summary>
     private bool Condition(int index) => index switch
     {
@@ -471,10 +498,58 @@ public sealed partial class Z80Cpu
     };
 
     /// <summary>r[index] in opcode order B, C, D, E, H, L, (HL), A; index 6 reads memory.</summary>
-    private byte ReadRegisterOrMemory(int index) => index == 6 ? ReadByte(HL) : GetRegister(index);
+    private byte ReadRegisterOrMemory(int index) =>
+        index == 6 ? ReadByte(MemoryOperandAddress()) : GetRegister(index);
 
-    /// <summary>r[index] for every index except 6, which is (HL) and goes through the bus.</summary>
-    private byte GetRegister(int index) => index switch
+    /// <summary>
+    /// Address of the (HL) operand. After DD or FD it is (IX+d) or (IY+d): the displacement is
+    /// read, then 5 internal T-states, and MEMPTR takes the address.
+    /// </summary>
+    private ushort MemoryOperandAddress()
+    {
+        if (_index == IndexHL)
+        {
+            return HL;
+        }
+
+        var address = IndexedAddress(ReadOperand());
+        Internal(5);
+        return address;
+    }
+
+    private ushort IndexedAddress(byte displacement)
+    {
+        var address = (ushort)(IndexRegister + (sbyte)displacement);
+        WZ = address;
+        return address;
+    }
+
+    /// <summary>r[index] except 6; after DD or FD, H and L become the halves of IX or IY.</summary>
+    private byte GetRegister(int index)
+    {
+        if (_index == IndexHL || index is not (4 or 5))
+        {
+            return GetPlainRegister(index);
+        }
+
+        var value = IndexRegister;
+        return index == 4 ? (byte)(value >> 8) : (byte)value;
+    }
+
+    private void SetRegister(int index, byte value)
+    {
+        if (_index == IndexHL || index is not (4 or 5))
+        {
+            SetPlainRegister(index, value);
+            return;
+        }
+
+        var pair = IndexRegister;
+        IndexRegister = index == 4 ? (ushort)((value << 8) | (pair & 0xFF)) : (ushort)((pair & 0xFF00) | value);
+    }
+
+    /// <summary>r[index] without the IX/IY substitution.</summary>
+    private byte GetPlainRegister(int index) => index switch
     {
         0 => B,
         1 => C,
@@ -485,7 +560,7 @@ public sealed partial class Z80Cpu
         _ => A,
     };
 
-    private void SetRegister(int index, byte value)
+    private void SetPlainRegister(int index, byte value)
     {
         switch (index)
         {
@@ -499,12 +574,12 @@ public sealed partial class Z80Cpu
         }
     }
 
-    /// <summary>rp[index]: BC, DE, HL, SP.</summary>
+    /// <summary>rp[index]: BC, DE, HL (IX or IY after a prefix), SP.</summary>
     private ushort GetRegisterPair(int index) => index switch
     {
         0 => BC,
         1 => DE,
-        2 => HL,
+        2 => IndexRegister,
         _ => SP,
     };
 
@@ -514,7 +589,7 @@ public sealed partial class Z80Cpu
         {
             case 0: BC = value; break;
             case 1: DE = value; break;
-            case 2: HL = value; break;
+            case 2: IndexRegister = value; break;
             default: SP = value; break;
         }
     }

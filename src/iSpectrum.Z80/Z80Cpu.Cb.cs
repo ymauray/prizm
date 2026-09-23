@@ -38,6 +38,44 @@ public sealed partial class Z80Cpu
         }
     }
 
+    /// <summary>
+    /// DDCB d op / FDCB d op: the operand is always (IX+d) or (IY+d). The opcode byte comes after
+    /// the displacement and is read as data, without an M1 cycle, so R does not advance for it.
+    /// </summary>
+    private void ExecuteIndexedCb()
+    {
+        var address = IndexedAddress(ReadOperand());
+        var opcode = ReadOperand();
+        Internal(2);
+        var x = opcode >> 6;
+        var y = (opcode >> 3) & 7;
+        var z = opcode & 7;
+
+        var value = ReadByte(address);
+        Internal(1);
+
+        if (x == 1)
+        {
+            // BIT n,(IX+d): bits 3 and 5 from the high byte of the address (MEMPTR).
+            Bit(y, value, (byte)(address >> 8));
+            return;
+        }
+
+        var result = x switch
+        {
+            0 => RotateOrShift(y, value),
+            2 => (byte)(value & ~(1 << y)),
+            _ => (byte)(value | (1 << y)),
+        };
+        WriteByte(address, result);
+
+        // Undocumented: for z != 6 the result is also copied into r[z] (plain H and L, not IXH/IXL).
+        if (z != 6)
+        {
+            SetPlainRegister(z, result);
+        }
+    }
+
     /// <summary>RLC, RRC, RL, RR, SLA, SRA, SLL (undocumented: shifts in a 1), SRL.</summary>
     private byte RotateOrShift(int operation, byte value)
     {

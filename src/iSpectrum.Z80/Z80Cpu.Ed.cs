@@ -9,6 +9,8 @@ public sealed partial class Z80Cpu
 
     private void ExecuteEd()
     {
+        // A DD or FD before ED has no effect: ED instructions always use HL.
+        _index = IndexHL;
         var opcode = FetchOpcode();
         var x = opcode >> 6;
         var y = (opcode >> 3) & 7;

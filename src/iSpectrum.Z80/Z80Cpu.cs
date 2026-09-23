@@ -118,6 +118,33 @@ public sealed partial class Z80Cpu
 
     // Register pairs.
 
+    private const int IndexHL = 0;
+    private const int IndexIX = 1;
+    private const int IndexIY = 2;
+
+    /// <summary>Which of HL, IX or IY the current instruction uses, as selected by a DD or FD prefix.</summary>
+    private int _index;
+
+    /// <summary>HL, or IX / IY when the current instruction has a DD / FD prefix.</summary>
+    private ushort IndexRegister
+    {
+        get => _index switch
+        {
+            IndexHL => HL,
+            IndexIX => IX,
+            _ => IY,
+        };
+        set
+        {
+            switch (_index)
+            {
+                case IndexHL: HL = value; break;
+                case IndexIX: IX = value; break;
+                default: IY = value; break;
+            }
+        }
+    }
+
     private ushort BC { get => (ushort)((B << 8) | C); set { B = (byte)(value >> 8); C = (byte)value; } }
 
     private ushort DE { get => (ushort)((D << 8) | E); set { D = (byte)(value >> 8); E = (byte)value; } }
