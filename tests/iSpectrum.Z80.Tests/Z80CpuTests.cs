@@ -4,22 +4,6 @@ namespace iSpectrum.Z80.Tests;
 
 public class Z80CpuTests
 {
-    private sealed class FlatMemory : IMemory
-    {
-        private readonly byte[] _ram = new byte[0x10000];
-
-        public byte Read(ushort address) => _ram[address];
-
-        public void Write(ushort address, byte value) => _ram[address] = value;
-    }
-
-    private sealed class NullIo : IIo
-    {
-        public byte In(ushort port) => 0xFF;
-
-        public void Out(ushort port, byte value) { }
-    }
-
     [Fact]
     public void Reset_SetsPowerOnState()
     {

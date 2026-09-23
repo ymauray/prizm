@@ -7,6 +7,7 @@ public sealed partial class Z80Cpu
     /// <summary>Fetches, decodes and executes one instruction, adding its exact T-states.</summary>
     public void Step()
     {
+        _interruptsBlocked = false;
         var opcode = FetchOpcode();
         _index = IndexHL;
 
@@ -472,6 +473,7 @@ public sealed partial class Z80Cpu
 
             default:
                 IFF1 = IFF2 = true;
+                _interruptsBlocked = true;
                 break;
         }
     }

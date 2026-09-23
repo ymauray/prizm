@@ -58,7 +58,7 @@ public sealed class Z80Cpu
     public long TStates;
 
     public void Step();       // fetch – decode – execute d'une instruction
-    public void Interrupt();  // INT masquable déclenchée par l'ULA
+    public bool Interrupt();  // INT masquable déclenchée par l'ULA ; false si refusée (DI, juste après EI)
 }
 ```
 

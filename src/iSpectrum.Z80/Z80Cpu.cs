@@ -24,6 +24,12 @@ public sealed partial class Z80Cpu
     public int IM;
     public bool Halted;
 
+    /// <summary>
+    /// Set by EI: interrupts are not accepted until the next instruction has run, so that
+    /// EI followed by RET can return before a pending interrupt is taken.
+    /// </summary>
+    private bool _interruptsBlocked;
+
     /// <summary>T-states elapsed since the counter was last reset by the machine.</summary>
     public long TStates;
 
@@ -51,11 +57,55 @@ public sealed partial class Z80Cpu
         IFF1 = IFF2 = false;
         IM = 0;
         Halted = false;
+        _interruptsBlocked = false;
         TStates = 0;
     }
 
-    /// <summary>Maskable interrupt request (INT), raised by the ULA once per frame.</summary>
-    public void Interrupt() => throw new NotImplementedException();
+    /// <summary>
+    /// Maskable interrupt request (INT), raised by the ULA once per frame. Returns false when
+    /// the CPU does not accept it (IFF1 reset, or the instruction just executed was EI); the
+    /// ULA holds INT for 32 T-states, so the machine may try again.
+    /// </summary>
+    /// <remarks>
+    /// On the Spectrum nothing drives the data bus during the acknowledge, so it reads 0xFF:
+    /// IM 0 then executes RST 38h like IM 1, and IM 2 takes its vector from (I * 256 + 0xFF).
+    /// Timings follow FUSE: 13 T-states in IM 0/1 and 19 in IM 2.
+    /// </remarks>
+    public bool Interrupt()
+    {
+        if (!IFF1 || _interruptsBlocked)
+        {
+            return false;
+        }
+
+        // HALT leaves PC on its own opcode; the return address is the next instruction.
+        if (Halted)
+        {
+            Halted = false;
+            PC++;
+        }
+
+        IFF1 = IFF2 = false;
+
+        // The acknowledge is an M1 cycle with 2 extra wait states: R advances, 7 T-states.
+        IncrementR();
+        Internal(7);
+        Push(PC);
+
+        if (IM == 2)
+        {
+            var vector = (ushort)((I << 8) | 0xFF);
+            var low = ReadByte(vector);
+            PC = (ushort)(low | (ReadByte((ushort)(vector + 1)) << 8));
+        }
+        else
+        {
+            PC = 0x0038;
+        }
+
+        WZ = PC;
+        return true;
+    }
 
     // Bus access. Each helper adds the T-states of its machine cycle, so an instruction's
     // total is the sum of its cycles plus the explicit internal cycles (Internal).
@@ -64,10 +114,13 @@ public sealed partial class Z80Cpu
     private byte FetchOpcode()
     {
         var opcode = _memory.Read(PC++);
-        R = (byte)((R & 0x80) | ((R + 1) & 0x7F));
+        IncrementR();
         TStates += 4;
         return opcode;
     }
+
+    /// <summary>R counts M1 cycles in its low 7 bits; bit 7 only changes through LD R,A.</summary>
+    private void IncrementR() => R = (byte)((R & 0x80) | ((R + 1) & 0x7F));
 
     private byte ReadByte(ushort address)
     {
