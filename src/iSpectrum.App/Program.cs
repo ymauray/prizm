@@ -174,7 +174,7 @@ while (!Raylib.WindowShouldClose() && !quit)
 
     if (IsPaused())
     {
-        audio.Pump();
+        // Nothing runs: once the ring is empty, the sound card holds the last sample, which is silent.
     }
     else if (turbo && IsLoading())
     {
@@ -189,7 +189,6 @@ while (!Raylib.WindowShouldClose() && !quit)
 
         spectrum.Headless = false;
         RunFrame();
-        audio.Pump();
     }
     else if (audio.IsReady)
     {
@@ -199,8 +198,6 @@ while (!Raylib.WindowShouldClose() && !quit)
             RunFrame();
             audio.Write(spectrum.AudioSamples);
         }
-
-        audio.Pump();
     }
     else
     {
