@@ -362,6 +362,10 @@ public sealed partial class Z80Cpu
                     WZ = address;
                     Call(address);
                 }
+                else if (p == 2)
+                {
+                    ExecuteEd();
+                }
                 else
                 {
                     throw PrefixNotImplemented(opcode);
