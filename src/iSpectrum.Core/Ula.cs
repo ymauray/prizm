@@ -279,6 +279,34 @@ public sealed class Ula : IIo, IScreenWriteObserver
     }
 
     /// <summary>
+    /// Draws the whole picture from the memory as it is now, with the current border colour,
+    /// ignoring the beam: for a machine stopped in the middle of a frame (in the debugger), whose
+    /// last complete frame no longer shows what its memory holds. The frame being drawn by the
+    /// beam is not disturbed.
+    /// </summary>
+    public void DrawNow(ReadOnlySpan<byte> screen)
+    {
+        var border = Palette.Colors[_border];
+        for (var row = 0; row < FrameHeight; row++)
+        {
+            var line = _frameBuffer.AsSpan(row * FrameWidth, FrameWidth);
+            var y = row - BorderTop;
+            if (y is < 0 or >= ScreenLayout.Height)
+            {
+                line.Fill(border);
+                continue;
+            }
+
+            line[..BorderLeft].Fill(border);
+            line[(BorderLeft + ScreenLayout.Width)..].Fill(border);
+            for (var x = 0; x < ScreenLayout.Width; x += 8)
+            {
+                DrawCell(line.Slice(BorderLeft + x, 8), x, y, screen);
+            }
+        }
+    }
+
+    /// <summary>
     /// Draws, in beam order, every pixel the beam reaches at or before <paramref name="time"/>:
     /// border pixels one by one, screen pixels by groups of 8 (4 T-states).
     /// </summary>
