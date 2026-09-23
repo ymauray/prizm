@@ -64,6 +64,13 @@ public sealed class TapePlayer : ISoundSource
 
     public bool AtEnd => _cursor.AtEnd;
 
+    /// <summary>
+    /// The select block (TZX 0x28) the deck has stopped at, waiting for the user's choice
+    /// (<see cref="Choose"/> or <see cref="SkipChoice"/>); null otherwise. The deck does not play
+    /// until then.
+    /// </summary>
+    public TapeBlock? PendingSelect { get; private set; }
+
     /// <summary>Whether the machine is a 48K, on which the TZX block "stop the tape if in 48K mode" stops the tape.</summary>
     public bool Is48K { get; set; } = true;
 
@@ -80,6 +87,7 @@ public sealed class TapePlayer : ISoundSource
 
     public void Rewind()
     {
+        PendingSelect = null;
         _playing = false;
         _stopAfterEdge = false;
         _loaderReads = 0;
@@ -90,7 +98,7 @@ public sealed class TapePlayer : ISoundSource
     /// <summary>Starts playing the current block at <paramref name="now"/> (a T-state of the current frame).</summary>
     public void Play(long now)
     {
-        if (!_playing && !AtEnd)
+        if (!_playing && !AtEnd && PendingSelect is null)
         {
             _playing = true;
             _stopAfterEdge = false;
@@ -99,6 +107,28 @@ public sealed class TapePlayer : ISoundSource
     }
 
     public void Stop() => _playing = false;
+
+    /// <summary>Goes on at the block the choice <paramref name="choice"/> of the pending select block leads to.</summary>
+    public void Choose(int choice)
+    {
+        if (PendingSelect is not { } select)
+        {
+            return;
+        }
+
+        PendingSelect = null;
+        _cursor.MoveTo(Math.Clamp(CurrentBlock + select.Offsets[choice], 0, BlockCount));
+    }
+
+    /// <summary>Makes no choice: goes on at the block after the pending select block.</summary>
+    public void SkipChoice()
+    {
+        if (PendingSelect is not null)
+        {
+            PendingSelect = null;
+            _cursor.MoveTo(CurrentBlock + 1);
+        }
+    }
 
     /// <summary>
     /// Called on each read of the ULA port, with the CPU's B register: starts the tape when a
@@ -156,6 +186,20 @@ public sealed class TapePlayer : ISoundSource
             {
                 _playing = false;
                 _stopAfterEdge = false;
+                break;
+            }
+
+            if (_tape.Blocks[CurrentBlock] is { Kind: TapeBlockKind.Select } select)
+            {
+                // A menu with no choice would never go on.
+                if (select.Offsets.Count == 0)
+                {
+                    _cursor.MoveTo(CurrentBlock + 1);
+                    continue;
+                }
+
+                _playing = false;
+                PendingSelect = select;
                 break;
             }
 

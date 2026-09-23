@@ -30,6 +30,12 @@ public enum TapeBlockKind
 
     Return,
 
+    /// <summary>
+    /// A menu for the user (TZX block 0x28): each of <see cref="TapeBlock.Texts"/> goes on
+    /// at the matching one of <see cref="TapeBlock.Offsets"/>. The deck stops there and waits.
+    /// </summary>
+    Select,
+
     /// <summary>Text, groups and other information: nothing to play.</summary>
     Info,
 }
@@ -54,8 +60,11 @@ public sealed class TapeBlock
     /// <summary>Loop count, jump offset, or level (1 for high) of a set-level block.</summary>
     public int Value { get; init; }
 
-    /// <summary>The offsets of a call sequence.</summary>
+    /// <summary>The offsets of a call sequence or a select block, relative to the block.</summary>
     public IReadOnlyList<int> Offsets { get; init; } = [];
+
+    /// <summary>The choices of a select block, one for each offset.</summary>
+    public IReadOnlyList<string> Texts { get; init; } = [];
 
     /// <summary>
     /// The bytes of a block the ROM's LD-BYTES can read (flag, data, checksum), when it is sent
