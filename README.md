@@ -55,7 +55,7 @@ rangez vos fichiers personnels dans `local/`, ignoré par Git.
 ## Tester
 
 ```sh
-dotnet test -c Release                   # tout, environ 40 s
+dotnet test -c Release                   # tout, environ 50 s
 dotnet test --filter "Category!=Slow"    # sans ZEXDOC ni ZEXALL, quelques secondes
 ```
 

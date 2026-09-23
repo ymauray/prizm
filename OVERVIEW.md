@@ -11,18 +11,21 @@ GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
 
 ## 0. État d'avancement
 
-**Jalons 1 à 6 terminés** (tags Git `jalon-1` à `jalon-6`) : le Spectrum 48K démarre la ROM
+**Jalons 1 à 7 terminés** (tags Git `jalon-1` à `jalon-7`) : le Spectrum 48K démarre la ROM
 d'origine dans une fenêtre, on y tape du BASIC au clavier du Mac, le beeper se fait entendre, il
-charge et sauvegarde des snapshots, et il charge des cassettes `.TAP` en temps réel (son et
-bandes de couleur dans la bordure) ou instantanément. Deux jeux librement redistribuables de
+charge et sauvegarde des snapshots, il charge des cassettes `.TAP` en temps réel (son et bandes
+de couleur dans la bordure) ou instantanément, et il reproduit la contention mémoire de l'ULA,
+avec une image dessinée au fil du faisceau. Deux jeux librement redistribuables de
 David Hembrow tournent : *Miner* (1983, `.z80`) et *Corona-V* (2020, `.tap`).
 
 Ce qui existe :
 
 - `src/iSpectrum.Z80` : CPU complet — toutes les instructions, préfixes `CB`, `ED`, `DD`, `FD`,
   `DDCB`, `FDCB`, opcodes non documentés, bits 3 et 5 des drapeaux, MEMPTR ; interruptions
-  IM 0/1/2, `HALT`, retard après `EI`.
-- `src/iSpectrum.Core` : `Memory48K` (ROM protégée en écriture), `Ula` (port `0xFE` : clavier
+  IM 0/1/2, `HALT`, retard après `EI` ; un point de contention à chaque cycle de bus, via
+  `IMemory.ContentionDelay`, `IMemory.IsContended` et `IIo.ContentionDelay` (0 par défaut).
+- `src/iSpectrum.Core` : `Contention48K` (table des délais de l'ULA), `Memory48K` (ROM protégée
+  en écriture, RAM `0x4000`-`0x7FFF` contendue), `Ula` (port `0xFE` : clavier
   en lecture, bordure et haut-parleur en écriture ; rendu de l'écran avec BRIGHT et FLASH), `Keyboard` et
   `SpectrumKey` (matrice 8 demi-rangées × 5 touches), `Beeper` (échantillons audio de chaque
   frame, haut-parleur et signal de cassette mélangés), `AutoTyper` (frappe de touches
@@ -41,7 +44,7 @@ Ce qui existe :
   `~/Documents/iSpectrum`, Cmd+F ouvre ce dossier ; Cmd+L bascule chargement réel / rapide,
   Cmd+T le turbo pendant un chargement. Messages dans le titre de la fenêtre (pas encore de
   texte à l'écran).
-- Tests : suite FUSE (1356 tests), ZEXDOC et ZEXALL (catégorie `Slow`), interruptions,
+- Tests : suite FUSE (1356 tests, événements de bus compris), ZEXDOC et ZEXALL (catégorie `Slow`), interruptions,
   adressage écran, attributs, bordure, protection de la ROM, matrice clavier, et deux tests sur
   la vraie ROM qui relisent l'écran en comparant chaque case à la police de la ROM : le message
   de copyright au démarrage, puis `PRINT 2+2` et `PRINT "A+B=C"` tapés au clavier.
@@ -51,6 +54,9 @@ Ce qui existe :
 - Beeper : silence, nombre d'échantillons sur 50 frames, moyenne dans un échantillon, et
   `BEEP 1,0` joué par la vraie ROM, dont la hauteur (do, 261,6 Hz) est vérifiée.
 - Bordure : un changement de couleur apparaît à la position du faisceau où il a eu lieu.
+- Contention : table des délais, durée exacte d'un `NOP` en RAM contendue ou non et d'un `OUT`
+  vers l'ULA, et une couleur changée en plein milieu d'une rangée de caractères, qui ne touche
+  que les lignes sous le faisceau.
 - Cassette : instant exact de chaque front du signal ; la vraie ROM charge par `LOAD ""` un
   programme BASIC depuis le signal (bandes rouge/cyan et son du ton pilote vérifiés) ; le
   chargement rapide charge le même programme, saute un bloc au mauvais drapeau et affiche
@@ -94,10 +100,20 @@ Choix de comportement déjà faits (détaillés en commentaire dans le code) :
   environ 90 ms de latence). Sans périphérique audio, repli sur 50 images/s.
 - Clavier : les événements sont lus à chaque passage de la boucle (Raylib les efface au
   suivant), et une touche traduite ou spéciale reste enfoncée jusqu'à ce qu'une frame l'ait vue.
-- Bordure dessinée d'après le faisceau : changements horodatés, premier pixel de l'écran à
-  14 336 T-states, 224 T-states par ligne, 2 pixels par T-state. Approximation : l'ULA réelle
-  ne change la bordure que par paquets de 8 pixels, et quelques T-states de décalage sont à
-  caler au jalon 7. La zone d'écran reste dessinée d'un bloc en fin de frame.
+- Image dessinée d'après le faisceau : premier pixel de l'écran à 14 336 T-states, 224 T-states
+  par ligne, 2 pixels par T-state. Les changements de bordure sont horodatés ; la zone d'écran
+  est dessinée à la demande, juste avant chaque écriture dans la RAM d'écran (jusqu'au pixel
+  qui précède l'instant de l'écriture), et le reste en fin de frame. Approximations : l'ULA
+  réelle ne change la bordure que par paquets de 8 pixels, et quelques T-states de décalage
+  restent à caler sur des programmes de test.
+- Contention (48K) : motif 6, 5, 4, 3, 2, 1, 0, 0 par groupe de 8 T-states, sur les 128 premiers
+  T-states des 192 lignes d'écran, à partir du T-state 14 335, pour la RAM `0x4000`-`0x7FFF`.
+  Les points de contention du CPU (adresse de chaque cycle interne, motif des entrées-sorties
+  selon l'octet haut et le bit 0 du port) suivent FUSE, dont les tests les vérifient un par un.
+  L'acquittement d'une interruption n'est pas contendu (comme dans FUSE). Un `JR` non pris ne
+  lit pas son déplacement (comme FUSE).
+- Performances : environ 26 fois la vitesse réelle en jeu (1300 frames/s en Release, contre
+  1600 avant la contention) ; ZEXDOC et ZEXALL prennent environ 50 s au lieu de 40.
 - Cassette réelle : durées de la ROM (pilote 2168 T × 8063 avant un en-tête, × 3223 avant des
   données ; synchronisation 667 + 735 ; bit 0 = 2 × 855, bit 1 = 2 × 1710 ; pause de 1 s).
   Signal lu sur le bit 6 du port `0xFE` et mélangé au son à mi-volume. La cassette démarre
@@ -112,8 +128,8 @@ Choix de comportement déjà faits (détaillés en commentaire dans le code) :
 
 Reste en suspens :
 
-- Les événements de bus de FUSE (`MR`, `MW`, `MC`, `PR`, `PW`, `PC`) sont lus mais pas comparés.
-  Il faudra horodater chaque accès, ce qui ira avec la contention (jalon 7).
+- Bus flottant non émulé : un port non décodé lit toujours `0xFF`, alors que le vrai 48K y
+  renvoie l'octet que l'ULA est en train de lire (quelques jeux s'en servent pour se synchroniser).
 - NMI non implémentée (inutile sur un Spectrum sans interface).
 - Latence audio d'environ 90 ms : à réduire si elle gêne.
 - Les caractères du mode étendu (`[ ] { } ~ | \ ©`) ne sont pas traduits : il faudrait
@@ -122,9 +138,17 @@ Reste en suspens :
 - Pas encore de fenêtre « À propos » : le copyright Amstrad n'est mentionné que dans
   `README.md` et `roms/README.md`.
 
-**Prochaine étape : jalon 7** — contention mémoire (l'ULA retarde le CPU quand il accède à la
-RAM d'écran ou au port `0xFE` pendant l'affichage), rendu de la zone d'écran ligne par ligne,
-calage fin de la bordure ; c'est aussi le moment de comparer les événements de bus de FUSE.
+**Prochaine étape : suites de test tierces**, avant le jalon 8 :
+
+1. les tests de timing de zxspectrum4.net (35 groupes, instructions en mémoire contendue ou non),
+   déjà empaquetés avec leurs valeurs attendues par MrKWatkins/EmulatorTestSuites : à brancher
+   dans xUnit ; licence à vérifier (dans `local/` en attendant) ;
+2. `btime.tap`, `stime.tap`, `ulatest3.tap` (Spectrum Clone Design) : timing de la bordure, de
+   l'écran et du bus flottant, à vérifier à l'œil ; auteurs et licence à vérifier ;
+3. z80test de Patrik Rak (MIT) : tests CPU plus poussés que FUSE (dont `SCF`/`CCF` et le registre
+   « Q ») ; quelques échecs attendus.
+
+Ensuite, **jalon 8** : modèle 128K (pagination par le port `0x7FFD`, puce son AY-3-8912).
 
 ---
 
@@ -244,7 +268,7 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 ### Tests (dès le début)
 
 - **Suite de tests FUSE** (`tests.in` / `tests.expected`) : chaque instruction, registres,
-  MEMPTR, timings et mémoire (un test xUnit par cas FUSE).
+  MEMPTR, timings, mémoire et événements de bus (un test xUnit par cas FUSE).
 - **ZEXDOC / ZEXALL** : exécutés dans un mini-harnais CP/M (interception de `CALL 5`).
   Chacun exécute environ 47 milliards de T-states, d'où la catégorie `Slow`.
 - Intégrés dans un projet de tests xUnit. Commandes : voir `AGENTS.md`, section Tests.
@@ -314,7 +338,7 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 | 4 | Chargement `.SNA` / `.Z80` | Les premiers jeux tournent — **terminé** (`jalon-4`) |
 | 5 | Beeper | Le son fonctionne — **terminé** (`jalon-5`) |
 | 6 | `.TAP` : signal réel et chargement rapide | Chargement des cassettes courantes, avec son et bandes — **terminé** (`jalon-6`) |
-| 7 | Contention mémoire + rendu ligne par ligne | Démos et effets de bordure corrects (la bordure horodatée est faite depuis le jalon 6) |
+| 7 | Contention mémoire + rendu ligne par ligne | Démos et effets de bordure corrects — **terminé** (`jalon-7`), validation fine par des suites de test à venir |
 | 8 | Modèle 128K | Pagination (port `0x7FFD`) + puce son AY-3-8912 |
 | 9 | Débogueur intégré | Désassembleur, points d'arrêt, vue mémoire/registres |
 | 10 | `.TZX` | Chargeurs protégés / turbo (le signal de cassette existe depuis le jalon 6) |

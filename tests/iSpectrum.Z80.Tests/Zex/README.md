@@ -21,7 +21,7 @@ Le harnais (`CpmHarness`, dans `ZexTests.cs`) charge le programme en `0x0100`, �
 (`C = 2` et `C = 9`) en interceptant `CALL 5`, et s'arrête au retour en `0x0000`. Un test échoue
 si la sortie contient `ERROR` ou ne se termine pas par `Tests complete`.
 
-Chaque programme exécute environ 47 milliards de T-states : 40 s en Release, 4 min en Debug.
+Chaque programme exécute environ 47 milliards de T-states : environ 50 s en Release, plusieurs minutes en Debug.
 Les deux tests portent la catégorie `Slow` :
 
 - run rapide : `dotnet test --filter "Category!=Slow"` ;
