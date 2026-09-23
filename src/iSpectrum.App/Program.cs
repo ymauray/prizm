@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The iSpectrum contributors
 
 using System.Numerics;
+using iSpectrum.App;
 using iSpectrum.Core;
 using Raylib_cs;
 
@@ -14,6 +15,9 @@ var spectrum = new Spectrum48(File.ReadAllBytes(romPath));
 Raylib.InitWindow(Ula.FrameWidth * Scale, Ula.FrameHeight * Scale, "iSpectrum");
 Raylib.SetTargetFPS(FramesPerSecond);
 
+// Escape is the Spectrum's BREAK, not a way to quit: close the window to quit.
+Raylib.SetExitKey(KeyboardKey.Null);
+
 // The frame buffer is RGBA8888, the pixel format of an image made by GenImageColor.
 var image = Raylib.GenImageColor(Ula.FrameWidth, Ula.FrameHeight, Color.Black);
 var texture = Raylib.LoadTextureFromImage(image);
@@ -24,6 +28,7 @@ var source = new Rectangle(0, 0, Ula.FrameWidth, Ula.FrameHeight);
 
 while (!Raylib.WindowShouldClose())
 {
+    KeyMap.Apply(spectrum.Keyboard);
     spectrum.RunFrame();
     Raylib.UpdateTexture(texture, spectrum.FrameBuffer);
 
