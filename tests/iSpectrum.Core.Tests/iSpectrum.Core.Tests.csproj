@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="..\..\roms\48.rom" Link="roms\48.rom" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\..\roms\*.rom" LinkBase="roms" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Z80Test\*.tap" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

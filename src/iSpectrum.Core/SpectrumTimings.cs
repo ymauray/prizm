@@ -25,6 +25,19 @@ public sealed class SpectrumTimings
         firstPixelTState: 14336,
         interruptLength: 32);
 
+    /// <summary>
+    /// ZX Spectrum 128K: 3.5469 MHz, 311 lines of 228 T-states. FUSE returns the first floating
+    /// bus byte 26 T-states later than on the 48K (14364 against 14338), so the screen starts 26
+    /// T-states later too; contention starts 1 T-state before the first pixel on both models.
+    /// </summary>
+    public static readonly SpectrumTimings Spectrum128 = new(
+        clockRate: 3_546_900,
+        frameTStates: 70908,
+        lineTStates: 228,
+        firstContendedTState: 14361,
+        firstPixelTState: 14362,
+        interruptLength: 36);
+
     private readonly byte[] _contention;
 
     private SpectrumTimings(
