@@ -37,7 +37,7 @@ public sealed class Spectrum48
         Memory = new Memory48K(rom);
         Ula = new Ula();
         Cpu = new Z80Cpu(Memory, Ula);
-        Ula.Connect(Cpu);
+        Ula.Connect(Cpu, Memory);
         Memory.ScreenObserver = Ula;
     }
 

@@ -30,6 +30,9 @@ public sealed class Ula : IIo, IScreenWriteObserver
     /// <summary>T-states per scan line; the beam draws 2 pixels per T-state.</summary>
     public const int LineTStates = 224;
 
+    /// <summary>T-states between the CPU's call to In and the moment the Z80 latches the data.</summary>
+    private const int IoDataLatchDelay = 3;
+
     /// <summary>FLASH attributes swap ink and paper every 16 frames.</summary>
     private const int FlashPeriod = 16;
 
@@ -53,6 +56,7 @@ public sealed class Ula : IIo, IScreenWriteObserver
     private bool _flashInverted;
 
     private Z80Cpu? _cpu;
+    private Memory48K? _memory;
 
     /// <summary>The key matrix read through port 0xFE.</summary>
     public Keyboard Keyboard { get; } = new();
@@ -86,13 +90,16 @@ public sealed class Ula : IIo, IScreenWriteObserver
     /// <summary>
     /// Any even port selects the ULA: bits 0-4 are the keyboard half-rows selected by the high
     /// byte of the port address, bit 6 is the EAR input (the tape signal while it plays, 1
-    /// otherwise), bits 5 and 7 read 1. Odd ports have nothing behind them and read 0xFF.
+    /// otherwise), bits 5 and 7 read 1. Odd ports have nothing behind them: they read the
+    /// floating bus.
     /// </summary>
     public byte In(ushort port)
     {
         if ((port & 1) != 0)
         {
-            return 0xFF;
+            // The CPU calls In 1 T-state into its 4 T-state I/O cycle; the Z80 latches the data
+            // at the end of it, 3 T-states later.
+            return FloatingBus((_cpu?.TStates ?? 0) + IoDataLatchDelay);
         }
 
         Tape.AdvanceTo(_cpu?.TStates ?? 0, Beeper);
@@ -100,8 +107,52 @@ public sealed class Ula : IIo, IScreenWriteObserver
         return (byte)(0xA0 | ear | Keyboard.Read((byte)(port >> 8)));
     }
 
-    /// <summary>Gives the ULA the CPU whose T-state count stamps border and speaker changes.</summary>
-    public void Connect(Z80Cpu cpu) => _cpu = cpu;
+    /// <summary>
+    /// Gives the ULA the CPU whose T-state count stamps border and speaker changes, and the
+    /// memory it reads the screen from.
+    /// </summary>
+    public void Connect(Z80Cpu cpu, Memory48K memory)
+    {
+        _cpu = cpu;
+        _memory = memory;
+    }
+
+    /// <summary>
+    /// What a read from a port nobody answers returns on the 48K: the byte the ULA is reading at
+    /// <paramref name="tStates"/>. In each group of 8 T-states of a screen line, counted from the
+    /// line's first pixel (T-state 14336 for the first line), it reads a pixel byte at +3, its
+    /// attribute at +4, the next pixel byte at +5 and its attribute at +6; the rest of the time,
+    /// and outside the screen, the bus reads 0xFF.
+    /// </summary>
+    /// <remarks>
+    /// Layout as in FUSE (spectrum_unattached_port). Where the Z80 samples it within an IN is set
+    /// by Richard Butler's timing tests 35 to 37, which only pass with the end of the I/O cycle.
+    /// </remarks>
+    public byte FloatingBus(long tStates)
+    {
+        var sinceScreen = tStates - FirstPixelTState;
+        if (_memory is null || sinceScreen < 0)
+        {
+            return 0xFF;
+        }
+
+        var y = (int)(sinceScreen / LineTStates);
+        var position = (int)(sinceScreen % LineTStates);
+        if (y >= ScreenLayout.Height || position >= 128)
+        {
+            return 0xFF;
+        }
+
+        var x = (position / 8) * 16;
+        return (position % 8) switch
+        {
+            3 => _memory.Read(ScreenLayout.PixelAddress(x, y)),
+            4 => _memory.Read(ScreenLayout.AttributeAddress(x, y)),
+            5 => _memory.Read(ScreenLayout.PixelAddress(x + 8, y)),
+            6 => _memory.Read(ScreenLayout.AttributeAddress(x + 8, y)),
+            _ => 0xFF,
+        };
+    }
 
     /// <summary>Contended I/O points wait like contended memory (see <see cref="Contention48K"/>).</summary>
     public int ContentionDelay(ushort port, long tStates) => Contention48K.Delay(tStates);

@@ -66,7 +66,7 @@ public class UlaTests
     public void BorderChange_ShowsFromTheBeamPositionAtWhichItHappened()
     {
         var cpu = new Z80Cpu(new FlatRam(), _ula);
-        _ula.Connect(cpu);
+        _ula.Connect(cpu, new Memory48K(new byte[Memory48K.RomSize]));
         _ula.Border = 1;
 
         // Blue until the beam reaches the left border of screen line 100 (32 pixels, 16 T-states

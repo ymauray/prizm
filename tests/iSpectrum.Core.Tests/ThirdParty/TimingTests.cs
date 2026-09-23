@@ -9,12 +9,14 @@ namespace iSpectrum.Core.Tests.ThirdParty;
 /// Richard Butler's 48K timing tests (zxspectrum4.net): each test times a group of instructions,
 /// in uncontended or contended memory, against an interrupt, and compares three measures (R, a
 /// loop counter, SP) with the values the program holds for real machines. The harness follows
-/// MrKWatkins/EmulatorTestSuites. Tests 35 to 37 need the floating bus and are left out.
+/// MrKWatkins/EmulatorTestSuites. Tests 35 to 37 time port reads against the floating bus, so
+/// they start with a prepared screen (from the same place) in the screen memory.
 /// </summary>
 /// <remarks>
 /// The program is not in the repository (licence to check): put timing_tests_48k_v1.0.z80, from
 /// https://github.com/MrKWatkins/EmulatorTestSuites (src/MrKWatkins.EmulatorTestSuites.ZXSpectrum/Timing)
-/// or https://www.zxspectrum4.net/op_timing.php, in local/timing-tests/.
+/// or https://www.zxspectrum4.net/op_timing.php, in local/timing-tests/, and the four .scr files
+/// of that folder's Screens/ subfolder in local/timing-tests/screens/.
 /// </remarks>
 public class TimingTests
 {
@@ -42,6 +44,11 @@ public class TimingTests
             }
         }
 
+        // The floating-bus variants of the original BASIC program.
+        data.Add(35, false);
+        data.Add(35, true);
+        data.Add(36, true);
+        data.Add(37, true);
         return data;
     }
 
@@ -78,6 +85,12 @@ public class TimingTests
         while (cpu.PC != TestCode)
         {
             cpu.Step();
+        }
+
+        if (test >= 35)
+        {
+            var screen = File.ReadAllBytes(LocalFile.Path($"timing-tests/screens/{test}-{(contended ? "contended" : "uncontended")}.scr"));
+            spectrum.Memory.LoadRam(0x4000, screen);
         }
 
         cpu.TStates = 0;
