@@ -85,13 +85,17 @@ while (!Raylib.WindowShouldClose())
 
     if (turbo && IsLoading())
     {
-        // As many frames as fit in the time budget; their sound is dropped.
+        // As many frames as fit in the time budget, without picture or sound, then one drawn
+        // frame so that the screen keeps moving.
         turboTimer.Restart();
+        spectrum.Headless = true;
         while (turboTimer.Elapsed.TotalMilliseconds < TurboMillisecondsPerRedraw && IsLoading())
         {
             RunFrame();
         }
 
+        spectrum.Headless = false;
+        RunFrame();
         audio.Pump();
     }
     else if (audio.IsReady)
