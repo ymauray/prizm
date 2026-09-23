@@ -26,6 +26,12 @@ public sealed class Spectrum48
     /// <summary>The end of LD-BYTES: LD A,H / CP 1 / RET. H = 0 (checksum right) sets carry: success.</summary>
     private const ushort LdBytesExit = 0x05DF;
 
+    /// <summary>Whether the interrupt of the current frame has been taken.</summary>
+    private bool _interruptTaken;
+
+    /// <summary>Set between frames: the next <see cref="Step"/> starts a new one.</summary>
+    private bool _frameStarting = true;
+
     public Spectrum48(ReadOnlySpan<byte> rom)
     {
         Memory = new Memory48K(rom);
@@ -75,36 +81,54 @@ public sealed class Spectrum48
     /// </summary>
     public void RunFrame()
     {
-        var interruptTaken = false;
-        Ula.Beeper.StartFrame();
-        AutoTyper.NextFrame(Keyboard);
-
-        while (Cpu.TStates < FrameTStates)
+        do
         {
-            if (!interruptTaken && Cpu.TStates < InterruptLength)
-            {
-                interruptTaken = Cpu.Interrupt();
-            }
+            Step();
+        }
+        while (!_frameStarting);
+    }
 
-            if (FastLoad)
-            {
-                if (Cpu.PC == LdBytesReady && !Tape.AtEnd)
-                {
-                    LoadBlockAtOnce();
-                }
-            }
-            else if (Cpu.PC == LdBytes && !Tape.IsPlaying)
-            {
-                // Press "play" when the ROM starts listening to the tape.
-                Tape.Play(Cpu.TStates);
-            }
-
-            Cpu.Step();
+    /// <summary>
+    /// Runs one instruction (after taking the interrupt if it is due), and ends the frame when
+    /// its last T-state has passed. For debuggers and tests that stop in the middle of a frame.
+    /// </summary>
+    public void Step()
+    {
+        if (_frameStarting)
+        {
+            _frameStarting = false;
+            Ula.Beeper.StartFrame();
+            AutoTyper.NextFrame(Keyboard);
         }
 
-        Ula.EndFrameSound(Cpu.TStates, FrameTStates);
-        Cpu.TStates -= FrameTStates;
-        Ula.EndFrame(Memory.Contents);
+        if (!_interruptTaken && Cpu.TStates < InterruptLength)
+        {
+            _interruptTaken = Cpu.Interrupt();
+        }
+
+        if (FastLoad)
+        {
+            if (Cpu.PC == LdBytesReady && !Tape.AtEnd)
+            {
+                LoadBlockAtOnce();
+            }
+        }
+        else if (Cpu.PC == LdBytes && !Tape.IsPlaying)
+        {
+            // Press "play" when the ROM starts listening to the tape.
+            Tape.Play(Cpu.TStates);
+        }
+
+        Cpu.Step();
+
+        if (Cpu.TStates >= FrameTStates)
+        {
+            Ula.EndFrameSound(Cpu.TStates, FrameTStates);
+            Cpu.TStates -= FrameTStates;
+            Ula.EndFrame(Memory.Contents);
+            _interruptTaken = false;
+            _frameStarting = true;
+        }
     }
 
     /// <summary>
