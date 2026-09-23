@@ -81,6 +81,8 @@ carte son), `SAVE` vers un `.TAP`, menu du bloc TZX « select », démarrage en 
   BASIC 48 et le BASIC 128) et `SA-BYTES` appelé depuis du code machine.
 - Timing (Richard Butler) : 72 tests de durée d'instructions et de bus flottant, comparés aux
   mesures sur machine réelle ; ignorés si `local/timing-tests/` est absent.
+- Synchronisation ULA et bus flottant (Jan Bobrowski) : `btime.tap`, `stime.tap` et `ulatest3.tap`
+  (GPL) intégrés dans `tests/iSpectrum.Core.Tests/ZxTests/`.
 
 ### Choix de comportement (détaillés en commentaire dans le code)
 
@@ -187,7 +189,6 @@ Son et App :
 
 ### Reste en suspens
 
-- Tests visuels de l'ULA (`btime`, `stime`, `ulatest3`) : licence et références à trouver.
 - TZX : les blocs CSW et « generalized data » sont décodés en mémoire à l'ouverture (quelques
   mégaoctets au plus : sans conséquence).
 
@@ -248,6 +249,7 @@ iSpectrum/
 │   │   └── Zex/              # ZEXDOC/ZEXALL + harnais CP/M (provenance dans README.md)
 │   └── iSpectrum.Core.Tests/
 │       ├── Z80Test/          # z80test de Patrik Rak, MIT (provenance dans README.md)
+│       ├── ZxTests/          # btime, stime, ulatest3 de Jan Bobrowski, GPL (README.md)
 │       ├── ThirdParty/       # Tests de timing de Richard Butler (fichiers dans local/)
 │       ├── Tape/Libspectrum/ # Fichiers TZX de libspectrum, GPL (provenance dans README.md)
 │       ├── Debugging/, Snapshots/, Tape/
@@ -468,3 +470,4 @@ Alternative entièrement libre : **OpenSE BASIC** (ROM de remplacement compatibl
 - Sinclair Wiki / World of Spectrum : timings de l'ULA, contention, formats de fichiers
 - Code source de **FUSE** (référence et suite de tests)
 - ZEXDOC / ZEXALL (Frank D. Cringle)
+- *zxtests* (Jan Bobrowski) : tests de timing ULA, contention et bus flottant (`btime`, `stime`, `ulatest3`)
