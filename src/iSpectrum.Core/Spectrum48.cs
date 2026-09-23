@@ -26,6 +26,9 @@ public sealed class Spectrum48
 
     public Ula Ula { get; }
 
+    /// <summary>Keys held down; the front-end updates it between frames.</summary>
+    public Keyboard Keyboard => Ula.Keyboard;
+
     /// <summary>The picture of the last completed frame (see <see cref="Ula.FrameBuffer"/>).</summary>
     public ReadOnlySpan<uint> FrameBuffer => Ula.FrameBuffer;
 

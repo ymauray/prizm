@@ -11,16 +11,58 @@ public class BootTests
     [Fact]
     public void Rom_BootsToTheCopyrightMessage()
     {
-        var spectrum = new Spectrum48(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "roms", "48.rom")));
-
         // The ROM tests the RAM first; the message appears after about 85 frames (1.7 s).
-        for (var frame = 0; frame < 150; frame++)
-        {
-            spectrum.RunFrame();
-        }
+        var spectrum = Boot();
 
         Assert.Equal("© 1982 Sinclair Research Ltd", ScreenText.ReadRow(spectrum.Memory.Contents, 23).TrimEnd());
         Assert.Equal(7, spectrum.Ula.Border);
+    }
+
+    [Fact]
+    public void Rom_RunsABasicCommandTypedOnTheKeyboard()
+    {
+        var spectrum = Boot();
+
+        // In the 48K ROM, P at the start of a line is the PRINT keyword; Symbol Shift + K is "+".
+        Type(spectrum, SpectrumKey.P);
+        Type(spectrum, SpectrumKey.D2);
+        Type(spectrum, SpectrumKey.SymbolShift, SpectrumKey.K);
+        Type(spectrum, SpectrumKey.D2);
+        Type(spectrum, SpectrumKey.Enter);
+
+        Assert.StartsWith("4 ", ScreenText.ReadRow(spectrum.Memory.Contents, 0));
+        Assert.StartsWith("0 OK, 0:1", ScreenText.ReadRow(spectrum.Memory.Contents, 23));
+    }
+
+    private static Spectrum48 Boot()
+    {
+        var spectrum = new Spectrum48(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "roms", "48.rom")));
+        RunFrames(spectrum, 150);
+        return spectrum;
+    }
+
+    /// <summary>
+    /// Holds the keys for 5 frames, then releases them for 5 frames: long enough for the ROM,
+    /// which scans the keyboard once per frame, and short of its auto-repeat delay.
+    /// </summary>
+    private static void Type(Spectrum48 spectrum, params SpectrumKey[] keys)
+    {
+        foreach (var key in keys)
+        {
+            spectrum.Keyboard.SetKey(key, true);
+        }
+
+        RunFrames(spectrum, 5);
+        spectrum.Keyboard.ReleaseAll();
+        RunFrames(spectrum, 5);
+    }
+
+    private static void RunFrames(Spectrum48 spectrum, int count)
+    {
+        for (var frame = 0; frame < count; frame++)
+        {
+            spectrum.RunFrame();
+        }
     }
 }
 

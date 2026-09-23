@@ -6,7 +6,7 @@ using iSpectrum.Z80;
 namespace iSpectrum.Core;
 
 /// <summary>
-/// The ULA: port 0xFE (border for now; keyboard and beeper come with milestones 3 and 5) and
+/// The ULA: port 0xFE (keyboard and border; the beeper comes with milestone 5) and
 /// the video output. The whole frame is rendered at once at the end of each frame; line-by-line
 /// rendering, needed for border effects, comes with contention (milestone 7).
 /// </summary>
@@ -23,6 +23,9 @@ public sealed class Ula : IIo
     private readonly uint[] _frameBuffer = new uint[FrameWidth * FrameHeight];
     private int _frameCount;
 
+    /// <summary>The key matrix read through port 0xFE.</summary>
+    public Keyboard Keyboard { get; } = new();
+
     /// <summary>Border colour, 0-7, set by bits 0-2 of a write to port 0xFE.</summary>
     public int Border { get; private set; }
 
@@ -30,10 +33,12 @@ public sealed class Ula : IIo
     public ReadOnlySpan<uint> FrameBuffer => _frameBuffer;
 
     /// <summary>
-    /// Any even port selects the ULA. With no keyboard yet, every key reads as released (bits
-    /// 0-4 set); other bits read 1 too. Odd ports have nothing behind them and read 0xFF.
+    /// Any even port selects the ULA: bits 0-4 are the keyboard half-rows selected by the high
+    /// byte of the port address. Bits 5 and 7 read 1; bit 6 (EAR) reads 1 too until the tape
+    /// input exists. Odd ports have nothing behind them and read 0xFF.
     /// </summary>
-    public byte In(ushort port) => 0xFF;
+    public byte In(ushort port) =>
+        (port & 1) == 0 ? (byte)(0xE0 | Keyboard.Read((byte)(port >> 8))) : (byte)0xFF;
 
     public void Out(ushort port, byte value)
     {
