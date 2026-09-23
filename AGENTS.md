@@ -1,7 +1,8 @@
 # AGENTS.md — Consignes pour les agents de code
 
 Ce fichier s'adresse à tout agent de code (Claude Code, Codex, etc.) travaillant sur **iSpectrum**.
-Lire aussi **`OVERVIEW.md`** : architecture, détails techniques de la machine et plan par jalons.
+Lire aussi **`OVERVIEW.md`** : état d'avancement (§0), architecture, détails techniques de la
+machine et plan par jalons.
 
 ## Projet
 
@@ -39,7 +40,7 @@ Lire aussi **`OVERVIEW.md`** : architecture, détails techniques de la machine e
 
 - Toute modification du Z80 doit garder au vert :
   - la suite **FUSE** (`tests.in` / `tests.expected`) ;
-  - **ZEXDOC** (et idéalement **ZEXALL**) via le harnais CP/M.
+  - **ZEXDOC** et **ZEXALL** via le harnais CP/M (les deux passent depuis le jalon 1).
 - ZEXDOC et ZEXALL sont marqués `Category=Slow` : chacun exécute environ 47 milliards de T-states
   (40 s en Release, 4 min en Debug). Run rapide : `dotnet test --filter "Category!=Slow"`.
 - Ajouter des tests unitaires pour : adressage écran, décodage des attributs, matrice clavier,
@@ -55,7 +56,8 @@ Lire aussi **`OVERVIEW.md`** : architecture, détails techniques de la machine e
 - Avant de terminer une tâche : `dotnet build` sans avertissement et `dotnet test -c Release` au vert.
 - En cas de doute sur un comportement matériel, se référer à FUSE, au Sinclair Wiki et à
   *The Undocumented Z80 Documented* ; documenter le choix dans un commentaire.
-- Mettre à jour `OVERVIEW.md` si l'architecture ou le plan changent.
+- Mettre à jour `OVERVIEW.md` si l'architecture ou le plan changent, et son §0 (état
+  d'avancement) à la fin de chaque jalon. Chaque jalon terminé reçoit un tag annoté `jalon-N`.
 
 ## ROM et fichiers tiers
 

@@ -8,6 +8,47 @@ Projet personnel / open source d'émulateur ZX Spectrum écrit en C# (.NET).
 
 ---
 
+## 0. État d'avancement
+
+**Jalon 1 terminé** (tag Git `jalon-1`) : le CPU Z80 est complet et validé. Il n'y a encore
+aucune machine autour : ni carte mémoire Spectrum, ni ROM, ni ULA, ni front-end. Les seules
+implémentations de `IMemory` et `IIo` sont des doublures de test (64 Ko de RAM à plat).
+
+Ce qui existe :
+
+- `src/iSpectrum.Z80` : toutes les instructions, y compris les préfixes `CB`, `ED`, `DD`, `FD`,
+  `DDCB`, `FDCB`, les opcodes non documentés, les bits 3 et 5 des drapeaux et MEMPTR ;
+  interruptions IM 0/1/2, `HALT`, retard après `EI`.
+- `tests/iSpectrum.Z80.Tests` : suite FUSE (1356 tests), ZEXDOC et ZEXALL (catégorie `Slow`),
+  tests unitaires des interruptions et de l'état à la mise sous tension. Tout est au vert.
+
+Choix de comportement déjà faits (détaillés en commentaire dans le code) :
+
+- `SCF` / `CCF` : bits 3 et 5 pris dans `A | F`, comme FUSE (l'effet du registre interne « Q »
+  n'est pas émulé).
+- Instructions de bloc répétées (`LDIR`, `INIR`…) : drapeaux comme FUSE, sans les effets liés
+  à PC décrits en 2018.
+- `OUT (C),0` envoie 0 (Z80 NMOS du Spectrum).
+- Pendant l'acquittement d'une interruption, le bus de données lit `0xFF` : IM 0 se comporte
+  comme IM 1 (`RST 38h`), IM 2 lit son vecteur en `I × 256 + 0xFF`.
+- `Interrupt()` renvoie `false` si l'interruption est refusée (`DI`, ou juste après `EI`) ;
+  la machine pourra réessayer tant que l'ULA maintient INT (32 T-states).
+
+Reste en suspens :
+
+- Les événements de bus de FUSE (`MR`, `MW`, `MC`, `PR`, `PW`, `PC`) sont lus mais pas comparés.
+  Il faudra horodater chaque accès, ce qui ira avec la contention (jalon 7).
+- NMI non implémentée (inutile sur un Spectrum sans interface).
+- Licence du projet non choisie. Les fichiers de test FUSE et ZEX sont sous GPL v2+.
+- Pas encore de `README.md` à la racine ; il deviendra nécessaire avec la ROM (mention du
+  copyright Amstrad, voir §8).
+
+**Prochaine étape : jalon 2** — créer `iSpectrum.Core` (carte mémoire 16 Ko ROM + 48 Ko RAM,
+ULA minimale, boucle de frame) et `iSpectrum.App` (fenêtre Raylib-cs), ajouter la ROM 48K
+dans `roms/`, jusqu'à afficher « © 1982 Sinclair Research Ltd ».
+
+---
+
 ## 1. La machine à émuler (Spectrum 48K)
 
 | Composant | Détails |
@@ -23,19 +64,26 @@ Projet personnel / open source d'émulateur ZX Spectrum écrit en C# (.NET).
 
 ## 2. Architecture de la solution
 
+Les éléments marqués *(à venir)* n'existent pas encore.
+
 ```
 iSpectrum/
+├── AGENTS.md                 # Consignes pour les agents de code (CLAUDE.md y renvoie)
 ├── OVERVIEW.md
+├── Directory.Build.props     # net10.0, Nullable, TreatWarningsAsErrors pour tous les projets
 ├── iSpectrum.sln
 ├── src/
 │   ├── iSpectrum.Z80/        # CPU Z80 pur, sans dépendance (IMemory, IIo)
-│   ├── iSpectrum.Core/       # Machine : mémoire, ULA, clavier, beeper, formats de fichiers
-│   └── iSpectrum.App/        # Front-end : fenêtre, rendu, audio, entrées (Raylib-cs)
+│   ├── iSpectrum.Core/       # (à venir) Machine : mémoire, ULA, clavier, beeper, formats
+│   └── iSpectrum.App/        # (à venir) Front-end : fenêtre, rendu, audio, entrées (Raylib-cs)
 ├── tests/
-│   ├── iSpectrum.Z80.Tests/  # Tests FUSE + ZEXDOC/ZEXALL (harnais CP/M)
-│   └── iSpectrum.Core.Tests/ # Adressage écran, clavier, chargement SNA/Z80/TAP
+│   ├── iSpectrum.Z80.Tests/
+│   │   ├── Fuse/             # Suite FUSE + parseur et runner (provenance dans README.md)
+│   │   └── Zex/              # ZEXDOC/ZEXALL + harnais CP/M (provenance dans README.md)
+│   └── iSpectrum.Core.Tests/ # (à venir) Adressage écran, clavier, chargement SNA/Z80/TAP
+├── local/                    # Ignoré par Git : fichiers de test personnels (jeux…)
 └── roms/
-    └── 48.rom                # ROM Sinclair/Amstrad (voir §8)
+    └── 48.rom                # (à venir) ROM Sinclair/Amstrad (voir §8)
 ```
 
 Principe : **le cœur (Z80 + Core) ne dépend d'aucune bibliothèque graphique**. Le front-end
@@ -48,17 +96,22 @@ donc changer de front-end (Avalonia, MonoGame…) sans toucher à l'émulation.
 public interface IMemory { byte Read(ushort addr); void Write(ushort addr, byte value); }
 public interface IIo     { byte In(ushort port);   void Out(ushort port, byte value); }
 
-public sealed class Z80Cpu
+public sealed partial class Z80Cpu
 {
-    public byte A, F, B, C, D, E, H, L;   // + jeu alternatif A', F', B', C', D', E', H', L'
+    public byte A, F, B, C, D, E, H, L;
+    public byte A_, F_, B_, C_, D_, E_, H_, L_;   // jeu alternatif A', F'…
     public ushort IX, IY, SP, PC;
+    public ushort WZ;                             // MEMPTR (registre interne)
     public byte I, R;
     public bool IFF1, IFF2;
     public int IM;
+    public bool Halted;
     public long TStates;
 
+    public Z80Cpu(IMemory memory, IIo io);
+    public void Reset();      // état à la mise sous tension (AF = SP = 0xFFFF, comme FUSE)
     public void Step();       // fetch – decode – execute d'une instruction
-    public bool Interrupt();  // INT masquable déclenchée par l'ULA ; false si refusée (DI, juste après EI)
+    public bool Interrupt();  // INT masquable ; false si refusée (DI, juste après EI)
 }
 ```
 
@@ -69,7 +122,7 @@ public void RunFrame()
 {
     while (cpu.TStates < 69888) cpu.Step();
     cpu.TStates -= 69888;
-    cpu.Interrupt();          // 50 Hz
+    cpu.Interrupt();          // 50 Hz ; à réessayer tant que INT est maintenue si elle est refusée
     ula.RenderFrame(memory);  // framebuffer 320×256 (écran + bordure)
     beeper.EndFrame();        // buffer audio de la frame
 }
@@ -90,11 +143,31 @@ Le front-end appelle `RunFrame()` puis se synchronise à 50 Hz (idéalement sur 
 - Compter précisément les **T-states** de chaque instruction.
 - Registre `R` (rafraîchissement), modes d'interruption IM 0/1/2, `HALT`, `EI` retardé.
 
+Organisation du code (`src/iSpectrum.Z80`) :
+
+| Fichier | Contenu |
+|---|---|
+| `Z80Cpu.cs` | Registres, `Reset`, `Interrupt`, accès au bus minutés, paires de registres |
+| `Z80Cpu.Alu.cs` | Tables de drapeaux, opérations arithmétiques et logiques, `DAA` |
+| `Z80Cpu.Opcodes.cs` | `Step`, gestion des préfixes `DD`/`FD`, opcodes sans préfixe |
+| `Z80Cpu.Cb.cs` | Préfixe `CB`, et `DDCB`/`FDCB` |
+| `Z80Cpu.Ed.cs` | Préfixe `ED`, dont les instructions de bloc |
+
+Timing : chaque accès au bus ajoute la durée de son cycle machine (lecture d'opcode 4 T-states,
+lecture ou écriture mémoire 3, port 4) ; seuls les cycles internes sont ajoutés à la main
+(`Internal(n)`). La durée d'une instruction est donc la somme de ses cycles.
+
+Préfixes `DD`/`FD` : ils choisissent IX ou IY pour l'opcode suivant, et le décodeur sans
+préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(HL)` devient
+`(IX+d)`), plutôt que de dupliquer le décodeur.
+
 ### Tests (dès le début)
 
-- **Suite de tests FUSE** (`tests.in` / `tests.expected`) : chaque instruction, registres et timings.
+- **Suite de tests FUSE** (`tests.in` / `tests.expected`) : chaque instruction, registres,
+  MEMPTR, timings et mémoire (un test xUnit par cas FUSE).
 - **ZEXDOC / ZEXALL** : exécutés dans un mini-harnais CP/M (interception de `CALL 5`).
-- Intégrés dans un projet de tests xUnit.
+  Chacun exécute environ 47 milliards de T-states, d'où la catégorie `Slow`.
+- Intégrés dans un projet de tests xUnit. Commandes : voir `AGENTS.md`, section Tests.
 
 ---
 
@@ -155,7 +228,7 @@ Le front-end appelle `RunFrame()` puis se synchronise à 50 Hz (idéalement sur 
 
 | # | Jalon | Résultat attendu |
 |---|---|---|
-| 1 | CPU Z80 + harnais de tests | Tests FUSE et ZEXDOC/ZEXALL au vert |
+| 1 | CPU Z80 + harnais de tests | Tests FUSE et ZEXDOC/ZEXALL au vert — **terminé** (`jalon-1`) |
 | 2 | Mémoire + ROM + affichage écran | Message « © 1982 Sinclair Research Ltd » à l'écran |
 | 3 | Clavier | On peut taper et exécuter du BASIC |
 | 4 | Chargement `.SNA` / `.Z80` | Les premiers jeux tournent |
