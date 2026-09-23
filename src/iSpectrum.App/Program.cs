@@ -95,6 +95,9 @@ var menuBar = new MenuBar(
     ]),
     new Menu("Tape",
     [
+        new MenuItem("Play / Stop", KeyboardKey.P, PlayOrStopTape, () => spectrum.Tape.IsPlaying, Shift: true),
+        new MenuItem("Rewind", KeyboardKey.Null, RewindTape),
+        MenuItem.Separator,
         new MenuItem("Fast loading", KeyboardKey.L, ToggleFastLoad, () => fastLoad),
         new MenuItem("Turbo while loading", KeyboardKey.T, ToggleTurbo, () => turbo),
     ]),
@@ -322,6 +325,33 @@ void SwitchModel(bool to128)
     Reset();
 }
 
+// The ROM starts the tape by itself; a turbo loader may need a hand, after a block that stops it.
+void PlayOrStopTape()
+{
+    var tape = spectrum.Tape;
+    if (tape.IsPlaying)
+    {
+        tape.Stop();
+        Report("tape stopped");
+    }
+    else if (tape.AtEnd)
+    {
+        Report(tapeName is null ? "no tape" : "end of tape: rewind it first");
+    }
+    else
+    {
+        tape.Play(spectrum.Cpu.TStates);
+        Report("tape playing");
+    }
+}
+
+void RewindTape()
+{
+    spectrum.Tape.Rewind();
+    shownBlock = -1;
+    Report("tape rewound");
+}
+
 void ToggleFastLoad()
 {
     fastLoad = !fastLoad;
@@ -337,7 +367,7 @@ void ToggleTurbo()
 
 bool CanOpen(string path) => Snapshot.IsSupported(path) || IsTape(path);
 
-bool IsTape(string path) => Path.GetExtension(path).Equals(".tap", StringComparison.OrdinalIgnoreCase);
+bool IsTape(string path) => TapeImage.IsSupported(path);
 
 void Open(string path)
 {
@@ -358,7 +388,7 @@ void InsertTape(string path)
 {
     try
     {
-        var tape = TapFile.Parse(File.ReadAllBytes(path));
+        var tape = TapeImage.Load(path, File.ReadAllBytes(path));
         var machine = NewMachine();
         machine.Tape.Insert(tape);
         machine.LoadTapeAfterBoot();
