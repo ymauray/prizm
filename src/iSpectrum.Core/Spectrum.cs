@@ -84,6 +84,12 @@ public abstract class Spectrum
     public const int BootFrames = 100;
 
     /// <summary>
+    /// Once the machine has booted, starts loading from the tape as a user would: LOAD "" on the
+    /// 48K. Call it on a machine that has just been powered on.
+    /// </summary>
+    public virtual void LoadTapeAfterBoot() => AutoTyper.Start(AutoTyper.LoadCommand, BootFrames);
+
+    /// <summary>
     /// When set, LD-BYTES is intercepted and each block is copied straight into memory instead of
     /// being played; when clear, the ROM reads the tape signal in real time.
     /// </summary>

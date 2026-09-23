@@ -31,6 +31,12 @@ public sealed class Spectrum128 : Spectrum
 
     public override Memory128K Memory => _memory128;
 
+    /// <summary>Frames the 128K needs to test its RAM and show its menu.</summary>
+    public const int MenuFrames = 150;
+
+    /// <summary>"Tape Loader" is the menu's first entry, selected at power-on: ENTER runs LOAD "".</summary>
+    public override void LoadTapeAfterBoot() => AutoTyper.Start([[SpectrumKey.Enter]], MenuFrames);
+
     /// <summary>The tape routines are in ROM 1, the 48K BASIC; the 128K menu pages it in to load.</summary>
     protected override bool IsTapeRomPaged => _memory128.RomPage == 1;
 
