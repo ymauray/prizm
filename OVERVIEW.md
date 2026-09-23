@@ -16,10 +16,14 @@ GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
 pensé pour développer en assembleur (sjasmplus, symboles, rechargement en une touche). On y tape du BASIC au clavier du
 Mac, le son sort, il charge et sauvegarde des snapshots `.SNA` et `.Z80`, charge des cassettes
 `.TAP` et `.TZX` en temps réel (son et bandes dans la bordure) ou instantanément, chargeurs
-turbo et protégés compris (essayés : Speedlock 1, 2, 4 et 7, Alkatraz), et reproduit la
+turbo et protégés compris (essayés : Speedlock 1, 2, 4 et 7, Alkatraz), enregistre les `SAVE`
+dans un `.TAP`, et reproduit la
 contention mémoire et le bus flottant de l'ULA, avec une image dessinée au fil du faisceau. Deux
 jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`) et *Corona-V*
 (2020, `.tap`).
+
+Depuis le jalon 11, hors jalon, directement sur `main` : latence audio réduite (callback de la
+carte son), `SAVE` vers un `.TAP`, menu du bloc TZX « select », démarrage en 128K.
 
 ### Ce qui existe
 
