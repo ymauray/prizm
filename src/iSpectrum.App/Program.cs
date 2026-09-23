@@ -78,6 +78,7 @@ Raylib.UnloadImage(image);
 Raylib.SetTextureFilter(texture, TextureFilter.Point);
 using var font = new SpectrumFont(rom48);
 var aboutBox = new AboutBox(font);
+var tapeMenu = new SelectBox(font);
 
 var source = new Rectangle(0, 0, Ula.FrameWidth, Ula.FrameHeight);
 var quit = false;
@@ -166,10 +167,20 @@ while (!Raylib.WindowShouldClose() && !quit)
     }
 
     // Keyboard events must be read on every redraw: Raylib drops them at the next one. While
-    // the About box is open, it takes them; while the debugger is paused, its command line does.
+    // the About box or the tape menu is open, it takes them; while the debugger is paused, its
+    // command line does.
     if (aboutBox.IsOpen)
     {
         aboutBox.Update();
+        spectrum.Keyboard.ReleaseAll();
+    }
+    else if (tapeMenu.IsOpen)
+    {
+        if (tapeMenu.Update(MenuBar.Height, Raylib.GetScreenWidth(), Raylib.GetScreenHeight() - MenuBar.Height) is { } choice)
+        {
+            ChooseOnTape(choice);
+        }
+
         spectrum.Keyboard.ReleaseAll();
     }
     else if (!(showDebugger && debuggerPanel!.HasKeyboard))
@@ -211,6 +222,7 @@ while (!Raylib.WindowShouldClose() && !quit)
 
     ShowTapeProgress();
     WriteSavedBlocks();
+    ShowTapeMenu();
 
     // Stopped in the middle of a frame, the machine shows its memory as it is now, so that each
     // step that writes to the screen can be seen.
@@ -236,6 +248,11 @@ while (!Raylib.WindowShouldClose() && !quit)
     {
         var destination = new Rectangle(0, MenuBar.Height, Raylib.GetScreenWidth(), Raylib.GetScreenHeight() - MenuBar.Height);
         Raylib.DrawTexturePro(texture, source, destination, Vector2.Zero, 0, Color.White);
+    }
+
+    if (tapeMenu.IsOpen)
+    {
+        tapeMenu.Draw(MenuBar.Height, Raylib.GetScreenWidth(), Raylib.GetScreenHeight() - MenuBar.Height);
     }
 
     if (aboutBox.IsOpen)
@@ -500,6 +517,39 @@ void SaveSnapshot()
     {
         Report($"cannot save: {e.Message}");
     }
+}
+
+// Opens the menu of a TZX select block when the tape stops at one; closes it when the machine
+// or the tape has changed meanwhile.
+void ShowTapeMenu()
+{
+    var select = spectrum.Tape.PendingSelect;
+    if (select is not null && !tapeMenu.IsOpen)
+    {
+        tapeMenu.Open(select.Texts);
+        Report("tape menu: choose where the tape goes on");
+    }
+    else if (select is null && tapeMenu.IsOpen)
+    {
+        tapeMenu.Close();
+    }
+}
+
+// Goes on where the user chose (-1: the next block), and plays on, as the tape was playing.
+void ChooseOnTape(int choice)
+{
+    var tape = spectrum.Tape;
+    if (choice >= 0)
+    {
+        tape.Choose(choice);
+    }
+    else
+    {
+        tape.SkipChoice();
+    }
+
+    tape.Play(spectrum.Cpu.TStates);
+    shownBlock = -1;
 }
 
 // Appends what the ROM has saved to the recording, creating it at the first block.
