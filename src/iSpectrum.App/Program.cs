@@ -184,9 +184,18 @@ while (!Raylib.WindowShouldClose() && !quit)
     }
 
     ShowTapeProgress();
+
+    // Stopped in the middle of a frame, the machine shows its memory as it is now, so that each
+    // step that writes to the screen can be seen.
+    if (IsPaused())
+    {
+        spectrum.Ula.DrawNow(spectrum.Memory.Screen);
+    }
+
     Raylib.UpdateTexture(texture, spectrum.FrameBuffer);
 
     Raylib.BeginDrawing();
+    Raylib.ClearBackground(Color.Black);
     if (showDebugger)
     {
         // The picture at twice its size, memory under it, the debugger's column on the right.
