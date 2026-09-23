@@ -53,6 +53,20 @@ public sealed class Spectrum48
     /// <summary>The tape deck. It starts playing when the ROM starts loading.</summary>
     public TapePlayer Tape => Ula.Tape;
 
+    /// <summary>
+    /// Runs without drawing the picture or making sound, for tests and fast-forwarding; the
+    /// machine itself behaves exactly the same.
+    /// </summary>
+    public bool Headless
+    {
+        get => Ula.Headless;
+        set
+        {
+            Ula.Headless = value;
+            Ula.Beeper.Muted = value;
+        }
+    }
+
     /// <summary>Types key strokes on this machine, one frame at a time.</summary>
     public AutoTyper AutoTyper { get; } = new();
 

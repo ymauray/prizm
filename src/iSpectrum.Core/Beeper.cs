@@ -48,6 +48,12 @@ public sealed class Beeper
     private double _previousInput;
     private double _previousOutput;
 
+    /// <summary>
+    /// When set, no samples are made: the levels are only followed, so that sound resumes
+    /// correctly when it is cleared.
+    /// </summary>
+    public bool Muted { get; set; }
+
     /// <summary>The samples produced during the last frame, 16-bit signed, mono.</summary>
     public ReadOnlySpan<short> Samples => _samples.AsSpan(0, _count);
 
@@ -85,6 +91,19 @@ public sealed class Beeper
     {
         if (time <= _time)
         {
+            return;
+        }
+
+        if (Muted)
+        {
+            // Skip whole samples: only keep the sample boundaries where they would be.
+            if (time >= _sampleEnd)
+            {
+                _sampleEnd += (Math.Floor((time - _sampleEnd) / TStatesPerSample) + 1) * TStatesPerSample;
+                _area = 0;
+            }
+
+            _time = time;
             return;
         }
 

@@ -87,6 +87,12 @@ public sealed class Ula : IIo, IScreenWriteObserver
         }
     }
 
+    /// <summary>
+    /// When set, nothing is drawn: the frame buffer keeps the last picture drawn. Everything
+    /// else (contention, floating bus, border changes) goes on as usual.
+    /// </summary>
+    public bool Headless { get; set; }
+
     /// <summary>FrameWidth x FrameHeight pixels, row by row, in <see cref="Palette"/> format.</summary>
     public ReadOnlySpan<uint> FrameBuffer => _frameBuffer;
 
@@ -169,7 +175,13 @@ public sealed class Ula : IIo, IScreenWriteObserver
     /// drawn at the very T-state of the write shows the new value: the real ULA reads its bytes a
     /// little before it displays them.
     /// </summary>
-    void IScreenWriteObserver.BeforeScreenWrite(ReadOnlySpan<byte> memory) => RenderUpTo((_cpu?.TStates ?? 0) - 1, memory);
+    void IScreenWriteObserver.BeforeScreenWrite(ReadOnlySpan<byte> memory)
+    {
+        if (!Headless)
+        {
+            RenderUpTo((_cpu?.TStates ?? 0) - 1, memory);
+        }
+    }
 
     /// <summary>
     /// Bits 0-2 set the border, bit 4 the speaker. Bit 3 (MIC) also reaches the speaker on real
@@ -220,7 +232,10 @@ public sealed class Ula : IIo, IScreenWriteObserver
     /// <summary>Finishes drawing the frame, then starts the next one: FLASH counter, border changes.</summary>
     public void EndFrame(ReadOnlySpan<byte> memory)
     {
-        RenderUpTo(long.MaxValue, memory);
+        if (!Headless)
+        {
+            RenderUpTo(long.MaxValue, memory);
+        }
 
         _frameCount++;
         _frameStartBorder = _border;

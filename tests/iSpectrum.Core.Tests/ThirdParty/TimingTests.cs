@@ -72,7 +72,10 @@ public class TimingTests
     /// </summary>
     private static (byte R, ushort Loop, ushort Sp) Run(int test, bool contended, out Spectrum48 spectrum)
     {
-        spectrum = new Spectrum48(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "roms", "48.rom")));
+        spectrum = new Spectrum48(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "roms", "48.rom")))
+        {
+            Headless = true,
+        };
         Z80Format.Load(spectrum, File.ReadAllBytes(LocalFile.Path(ProgramFile)));
 
         var cpu = spectrum.Cpu;

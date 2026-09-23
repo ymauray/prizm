@@ -91,6 +91,7 @@ internal sealed class Z80TestHarness(ITestOutputHelper output)
         var spectrum = new Spectrum48(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "roms", "48.rom")))
         {
             FastLoad = true,
+            Headless = true,
         };
         spectrum.Tape.Insert(TapFile.Parse(File.ReadAllBytes(path)));
         spectrum.AutoTyper.Start(AutoTyper.LoadCommand, Spectrum48.BootFrames);
