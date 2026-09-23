@@ -37,7 +37,7 @@ var turbo = false;
 string? tapeName = null;
 var shownBlock = -1;
 
-// The model new machines are built as: Cmd+M switches between the 48K and the 128K.
+// The model new machines are built as: Cmd+1 for the 48K, Cmd+2 for the 128K.
 var is128 = false;
 Spectrum spectrum = NewMachine();
 
@@ -141,8 +141,8 @@ void RunFrame()
 bool IsLoading() => spectrum.AutoTyper.IsBusy || spectrum.Tape.IsPlaying;
 
 // Cmd+S saves a snapshot, Cmd+O chooses a file to open, Cmd+F shows the snapshot folder,
-// Cmd+L switches fast tape loading, Cmd+T switches turbo, Cmd+M switches between the 48K and
-// the 128K, Cmd+R resets.
+// Cmd+L switches fast tape loading, Cmd+T switches turbo, Cmd+1 and Cmd+2 power on a 48K or a
+// 128K (Cmd+M is macOS's Minimize), Cmd+R resets.
 void HandleShortcuts()
 {
     if (!Raylib.IsKeyDown(KeyboardKey.LeftSuper) && !Raylib.IsKeyDown(KeyboardKey.RightSuper))
@@ -176,9 +176,9 @@ void HandleShortcuts()
         turbo = !turbo;
         Report(turbo ? "turbo while loading" : "normal speed while loading");
     }
-    else if (Raylib.IsKeyPressed(KeyboardKey.M))
+    else if (Raylib.IsKeyPressed(KeyboardKey.One) || Raylib.IsKeyPressed(KeyboardKey.Two))
     {
-        is128 = !is128;
+        is128 = Raylib.IsKeyPressed(KeyboardKey.Two);
         Reset();
     }
     else if (Raylib.IsKeyPressed(KeyboardKey.R))
