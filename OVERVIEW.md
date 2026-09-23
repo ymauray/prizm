@@ -35,9 +35,10 @@ jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`
   - `Beeper` (mélangeur : haut-parleur, cassette, AY), `ISoundSource`, `Ay8912` ;
   - `Keyboard`, `SpectrumKey`, `SpectrumCharacters`, `AutoTyper`, `ScreenLayout`, `Palette` ;
   - `Tape/` : `TapFile`, `TapePlayer` ; `Snapshots/` : `SnaFormat`, `Z80Format`, `Snapshot`.
-- `src/iSpectrum.App` : fenêtre Raylib-cs 960×768 (image ×3) ; `KeyboardInput` (clavier du Mac
-  traduit), `AudioOutput` (son, et cadence de l'émulation), `HostShell` (sélecteur de fichier,
-  Finder). Raccourcis : voir `README.md`. Messages dans le titre de la fenêtre.
+- `src/iSpectrum.App` : fenêtre Raylib-cs (image ×3 sous une barre de menu) ; `MenuBar` (menus
+  File, Machine, Tape dessinés dans la fenêtre ; menus et raccourcis partagent une seule liste
+  de commandes), `KeyboardInput` (clavier du Mac traduit), `AudioOutput` (son, et cadence de
+  l'émulation), `HostShell` (sélecteur de fichier, Finder). Messages dans le titre de la fenêtre.
 
 ### Tests
 
@@ -124,15 +125,16 @@ Son et App :
 
 ### Reste en suspens
 
-- Barre de menu dessinée dans la fenêtre (prochaine étape) : les raccourcis deviennent nombreux.
+- Barre de menu temporaire, en anglais (police de Raylib sans accents) : de vrais menus macOS
+  viendront avec un front-end plus complet (Avalonia, §6).
 - NMI non implémentée ; +2A/+3, Pentagon et autres modèles non émulés.
 - Latence audio d'environ 90 ms, à réduire si elle gêne.
 - Caractères du mode étendu (`[ ] { } ~ | \ ©`) non traduits au clavier.
 - Tests visuels de l'ULA (`btime`, `stime`, `ulatest3`) : licence et références à trouver.
 - Pas encore de fenêtre « À propos » (copyright Amstrad : `README.md` et `roms/README.md`).
 
-**Prochaine étape** : la barre de menu dessinée dans la fenêtre, puis le **jalon 9** (débogueur
-intégré : désassembleur, points d'arrêt, vue mémoire et registres).
+**Prochaine étape** : le **jalon 9**, débogueur intégré (désassembleur, points d'arrêt, vue
+mémoire et registres).
 
 ---
 

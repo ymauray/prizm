@@ -14,6 +14,19 @@ les règles de contribution (y compris pour les agents de code) dans [`AGENTS.md
 dotnet run --project src/iSpectrum.App
 ```
 
+## Menus
+
+Une barre de menu, en haut de la fenêtre, réunit toutes les commandes avec leur raccourci :
+
+| Menu | Commandes |
+|---|---|
+| **File** | Open... (Cmd+O), Save snapshot (Cmd+S), Show snapshot folder (Cmd+F), Quit (Cmd+Q) |
+| **Machine** | ZX Spectrum 48K (Cmd+1), ZX Spectrum 128K (Cmd+2), Reset (Cmd+R) |
+| **Tape** | Fast loading (Cmd+L), Turbo while loading (Cmd+T) |
+
+Les coches indiquent le modèle en cours et les options actives. Les libellés sont en anglais :
+la police intégrée de Raylib n'a pas de lettres accentuées.
+
 ## Modèles
 
 La machine démarre en 48K. **Cmd+1** allume un 48K, **Cmd+2** un 128K (qui démarre sur son
@@ -51,8 +64,9 @@ L'émulateur ouvre les snapshots `.SNA` et `.Z80` (48K et 128K) et les cassettes
 
 Une cassette redémarre la machine, qui tape `LOAD ""` d'elle-même (sur le 128K, elle choisit
 « Tape Loader » dans le menu). Par défaut, elle se charge **en temps réel**, comme en 1983 : son de chargement, bandes de couleur dans la bordure, et
-quelques minutes d'attente pour un gros jeu. **Cmd+T** accélère le chargement (sans le son),
-**Cmd+L** passe au chargement **rapide** (instantané, sans signal). Le titre de la fenêtre
+quelques minutes d'attente pour un gros jeu. **Turbo while loading** (Cmd+T) joue la cassette en accéléré, sans le son ; **Fast loading**
+(Cmd+L) la court-circuite et copie chaque bloc en mémoire (instantané, sans signal, mais
+seulement pour les programmes qui chargent par la ROM). Le titre de la fenêtre
 indique le bloc de la cassette en cours de lecture. Un snapshot, lui, se charge dans le
 modèle qu'il indique.
 
