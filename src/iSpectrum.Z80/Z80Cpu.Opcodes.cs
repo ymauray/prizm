@@ -11,6 +11,7 @@ public sealed partial class Z80Cpu
     public void Step()
     {
         _interruptsBlocked = false;
+        _flagsWritten = false;
         var opcode = FetchOpcode();
         _index = IndexHL;
 
@@ -33,6 +34,8 @@ public sealed partial class Z80Cpu
             case 2: Alu(y, ReadRegisterOrMemory(z)); break;
             default: ExecuteX3(y, z); break;
         }
+
+        _q = _flagsWritten ? F : (byte)0;
     }
 
     private void ExecuteX0(int y, int z)
@@ -135,7 +138,8 @@ public sealed partial class Z80Cpu
 
             case 1:
                 (A, A_) = (A_, A);
-                (F, F_) = (F_, F);
+                // Swapping the flags does not compute them: Q stays 0.
+                (_f, F_) = (F_, _f);
                 break;
 
             case 2:
@@ -269,15 +273,15 @@ public sealed partial class Z80Cpu
                 F = (byte)((F & (FlagS | FlagZ | FlagPV | FlagC)) | FlagH | FlagN | (A & (Flag5 | Flag3)));
                 break;
 
-            // SCF and CCF take bits 3 and 5 from A | F, as FUSE does. Real hardware depends on
-            // whether the previous instruction changed F (the "Q" register), which FUSE ignores.
+            // SCF and CCF take bits 3 and 5 from (Q xor F) or A: after an instruction that wrote
+            // the flags, from A alone; otherwise from A or F. FUSE's tests start with Q = 0.
             case 6:
-                F = (byte)((F & (FlagS | FlagZ | FlagPV)) | ((A | F) & (Flag5 | Flag3)) | FlagC);
+                F = (byte)((F & (FlagS | FlagZ | FlagPV)) | (((_q ^ F) | A) & (Flag5 | Flag3)) | FlagC);
                 break;
 
             default:
                 F = (byte)((F & (FlagS | FlagZ | FlagPV))
-                    | ((A | F) & (Flag5 | Flag3))
+                    | (((_q ^ F) | A) & (Flag5 | Flag3))
                     | ((F & FlagC) != 0 ? FlagH : FlagC));
                 break;
         }

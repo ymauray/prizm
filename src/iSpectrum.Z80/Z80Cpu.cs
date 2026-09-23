@@ -12,7 +12,30 @@ public sealed partial class Z80Cpu
     private readonly IIo _io;
 
     // Main register set.
-    public byte A, F, B, C, D, E, H, L;
+    public byte A, B, C, D, E, H, L;
+
+    private byte _f;
+
+    /// <summary>Flags. The CPU notes whether the current instruction writes them (see <see cref="_q"/>).</summary>
+    public byte F
+    {
+        get => _f;
+        set
+        {
+            _f = value;
+            _flagsWritten = true;
+        }
+    }
+
+    /// <summary>Whether the instruction being executed has written F.</summary>
+    private bool _flagsWritten;
+
+    /// <summary>
+    /// The internal "Q" register: F as the last instruction left it if that instruction wrote the
+    /// flags, 0 otherwise. SCF and CCF take bits 3 and 5 from (Q xor F) or A on Zilog Z80s
+    /// (David Banks, 2018; checked by z80test's z80ccf).
+    /// </summary>
+    private byte _q;
 
     // Alternate register set (A', F', B', C', D', E', H', L').
     public byte A_, F_, B_, C_, D_, E_, H_, L_;
@@ -60,6 +83,7 @@ public sealed partial class Z80Cpu
         IFF1 = IFF2 = false;
         IM = 0;
         Halted = false;
+        _q = 0;
         _interruptsBlocked = false;
         TStates = 0;
     }
@@ -89,6 +113,7 @@ public sealed partial class Z80Cpu
         }
 
         IFF1 = IFF2 = false;
+        _q = 0;
 
         // The acknowledge is an M1 cycle with 2 extra wait states: R advances, 7 T-states,
         // without contention (as in FUSE).
@@ -271,5 +296,6 @@ public sealed partial class Z80Cpu
 
     private ushort HL { get => (ushort)((H << 8) | L); set { H = (byte)(value >> 8); L = (byte)value; } }
 
-    private ushort AF { get => (ushort)((A << 8) | F); set { A = (byte)(value >> 8); F = (byte)value; } }
+    /// <summary>AF, for PUSH and POP. POP AF loads the flags without computing them: Q stays 0.</summary>
+    private ushort AF { get => (ushort)((A << 8) | F); set { A = (byte)(value >> 8); _f = (byte)value; } }
 }
