@@ -24,11 +24,6 @@ public sealed class Ula : IIo, IScreenWriteObserver
     public const int FrameWidth = ScreenLayout.Width + (2 * BorderLeft);
     public const int FrameHeight = ScreenLayout.Height + (2 * BorderTop);
 
-    /// <summary>T-state at which the beam draws the first pixel of the screen area (48K).</summary>
-    public const int FirstPixelTState = 14336;
-
-    /// <summary>T-states per scan line; the beam draws 2 pixels per T-state.</summary>
-    public const int LineTStates = 224;
 
     /// <summary>T-states between the CPU's call to In and the moment the Z80 latches the data.</summary>
     private const int IoDataLatchDelay = 3;
@@ -58,14 +53,27 @@ public sealed class Ula : IIo, IScreenWriteObserver
     private uint _borderColor = Palette.Colors[0];
     private bool _flashInverted;
 
+    private readonly SpectrumTimings _timings;
     private Z80Cpu? _cpu;
     private Memory48K? _memory;
+
+    /// <summary>A 48K ULA.</summary>
+    public Ula()
+        : this(SpectrumTimings.Spectrum48)
+    {
+    }
+
+    public Ula(SpectrumTimings timings)
+    {
+        _timings = timings;
+        Beeper = new Beeper(timings.ClockRate);
+    }
 
     /// <summary>The key matrix read through port 0xFE.</summary>
     public Keyboard Keyboard { get; } = new();
 
     /// <summary>The speaker, driven by bit 4 of port 0xFE, which also plays the tape signal.</summary>
-    public Beeper Beeper { get; } = new();
+    public Beeper Beeper { get; }
 
     /// <summary>The tape deck, whose signal is read on bit 6 of port 0xFE (EAR).</summary>
     public TapePlayer Tape { get; } = new();
@@ -143,14 +151,14 @@ public sealed class Ula : IIo, IScreenWriteObserver
     /// </remarks>
     public byte FloatingBus(long tStates)
     {
-        var sinceScreen = tStates - FirstPixelTState;
+        var sinceScreen = tStates - _timings.FirstPixelTState;
         if (_memory is null || sinceScreen < 0)
         {
             return 0xFF;
         }
 
-        var y = (int)(sinceScreen / LineTStates);
-        var position = (int)(sinceScreen % LineTStates);
+        var y = (int)(sinceScreen / _timings.LineTStates);
+        var position = (int)(sinceScreen % _timings.LineTStates);
         if (y >= ScreenLayout.Height || position >= 128)
         {
             return 0xFF;
@@ -167,8 +175,8 @@ public sealed class Ula : IIo, IScreenWriteObserver
         };
     }
 
-    /// <summary>Contended I/O points wait like contended memory (see <see cref="Contention48K"/>).</summary>
-    public int ContentionDelay(ushort port, long tStates) => Contention48K.Delay(tStates);
+    /// <summary>Contended I/O points wait like contended memory (see <see cref="SpectrumTimings"/>).</summary>
+    public int ContentionDelay(ushort port, long tStates) => _timings.ContentionDelay(tStates);
 
     /// <summary>
     /// Draws what the beam has shown so far, before the CPU changes the screen memory. A pixel
@@ -256,7 +264,7 @@ public sealed class Ula : IIo, IScreenWriteObserver
         for (; _row < FrameHeight; _row++, _column = 0)
         {
             var y = _row - BorderTop;
-            var lineStart = FirstPixelTState + ((long)y * LineTStates);
+            var lineStart = _timings.FirstPixelTState + ((long)y * _timings.LineTStates);
             var screenLine = y is >= 0 and < ScreenLayout.Height;
             var line = _frameBuffer.AsSpan(_row * FrameWidth, FrameWidth);
 

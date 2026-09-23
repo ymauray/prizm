@@ -5,7 +5,12 @@ namespace iSpectrum.Core.Tests;
 
 public class FloatingBusTests
 {
-    private const int Start = Ula.FirstPixelTState;
+    /// <summary>The 48K's first pixel T-state, as a constant for the attributes below.</summary>
+    private const int Start = 14336;
+
+    [Fact]
+    public void FirstPixelTState_Is14336_OnThe48K() =>
+        Assert.Equal(Start, SpectrumTimings.Spectrum48.FirstPixelTState);
 
     private readonly Spectrum48 _spectrum = new(new byte[Memory48K.RomSize]);
 

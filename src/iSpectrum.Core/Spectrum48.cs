@@ -9,10 +9,7 @@ namespace iSpectrum.Core;
 /// <summary>ZX Spectrum 48K: Z80, memory and ULA, run one 50 Hz frame at a time.</summary>
 public sealed class Spectrum48
 {
-    public const int FrameTStates = 69888;
 
-    /// <summary>The ULA holds INT low for 32 T-states at the start of each frame.</summary>
-    private const int InterruptLength = 32;
 
     /// <summary>LD-BYTES, the ROM routine that loads a block from tape.</summary>
     private const ushort LdBytes = 0x0556;
@@ -32,10 +29,13 @@ public sealed class Spectrum48
     /// <summary>Set between frames: the next <see cref="Step"/> starts a new one.</summary>
     private bool _frameStarting = true;
 
+    /// <summary>The 48K's clock, frame and contention timings.</summary>
+    public SpectrumTimings Timings { get; } = SpectrumTimings.Spectrum48;
+
     public Spectrum48(ReadOnlySpan<byte> rom)
     {
         Memory = new Memory48K(rom);
-        Ula = new Ula();
+        Ula = new Ula(Timings);
         Cpu = new Z80Cpu(Memory, Ula);
         Ula.Connect(Cpu, Memory);
         Memory.ScreenObserver = Ula;
@@ -115,7 +115,7 @@ public sealed class Spectrum48
             AutoTyper.NextFrame(Keyboard);
         }
 
-        if (!_interruptTaken && Cpu.TStates < InterruptLength)
+        if (!_interruptTaken && Cpu.TStates < Timings.InterruptLength)
         {
             _interruptTaken = Cpu.Interrupt();
         }
@@ -135,10 +135,10 @@ public sealed class Spectrum48
 
         Cpu.Step();
 
-        if (Cpu.TStates >= FrameTStates)
+        if (Cpu.TStates >= Timings.FrameTStates)
         {
-            Ula.EndFrameSound(Cpu.TStates, FrameTStates);
-            Cpu.TStates -= FrameTStates;
+            Ula.EndFrameSound(Cpu.TStates, Timings.FrameTStates);
+            Cpu.TStates -= Timings.FrameTStates;
             Ula.EndFrame(Memory.Contents);
             _interruptTaken = false;
             _frameStarting = true;

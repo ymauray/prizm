@@ -7,7 +7,7 @@ namespace iSpectrum.Core;
 
 /// <summary>
 /// 48K memory map: 16 KB of ROM at 0x0000-0x3FFF (writes ignored), 48 KB of RAM above, of which
-/// 0x4000-0x7FFF is shared with the ULA and contended (see <see cref="Contention48K"/>).
+/// 0x4000-0x7FFF is shared with the ULA and contended (see <see cref="SpectrumTimings"/>).
 /// </summary>
 public sealed class Memory48K : IMemory
 {
@@ -62,7 +62,8 @@ public sealed class Memory48K : IMemory
     }
 
     public int ContentionDelay(ushort address, long tStates) =>
-        Contention48K.IsContended(address) ? Contention48K.Delay(tStates) : 0;
+        IsContended(address) ? SpectrumTimings.Spectrum48.ContentionDelay(tStates) : 0;
 
-    public bool IsContended(ushort address) => Contention48K.IsContended(address);
+    /// <summary>The lower 16 KB of RAM, shared with the ULA.</summary>
+    public bool IsContended(ushort address) => (address & 0xC000) == 0x4000;
 }

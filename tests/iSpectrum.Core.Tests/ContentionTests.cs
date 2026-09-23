@@ -5,7 +5,12 @@ namespace iSpectrum.Core.Tests;
 
 public class ContentionTests
 {
-    private const int First = Contention48K.FirstContendedTState;
+    /// <summary>The 48K's first contended T-state, as a constant for the attributes below.</summary>
+    private const int First = 14335;
+
+    [Fact]
+    public void FirstContendedTState_Is14335_OnThe48K() =>
+        Assert.Equal(First, SpectrumTimings.Spectrum48.FirstContendedTState);
 
     [Theory]
     [InlineData(First - 1, 0)]
@@ -22,7 +27,7 @@ public class ContentionTests
     [InlineData(First + (191 * 224), 6)] // last screen line
     [InlineData(First + (192 * 224), 0)] // bottom border
     public void Delay_FollowsThe65432100Pattern_DuringScreenLines(int tStates, int expected) =>
-        Assert.Equal(expected, Contention48K.Delay(tStates));
+        Assert.Equal(expected, SpectrumTimings.Spectrum48.ContentionDelay(tStates));
 
     [Theory]
     [InlineData(0x3FFF, false)]
@@ -30,7 +35,7 @@ public class ContentionTests
     [InlineData(0x7FFF, true)]
     [InlineData(0x8000, false)]
     public void OnlyTheLowerRam_IsContended(int address, bool expected) =>
-        Assert.Equal(expected, Contention48K.IsContended((ushort)address));
+        Assert.Equal(expected, new Memory48K(new byte[Memory48K.RomSize]).IsContended((ushort)address));
 
     [Theory]
     [InlineData(0x6000, 6 + 4)] // the fetch waits 6 T-states, then takes 4
@@ -76,7 +81,7 @@ public class ContentionTests
         var spectrum = new Spectrum48(new byte[Memory48K.RomSize]);
         spectrum.Cpu.PC = start;
         var count = 0;
-        while (spectrum.Cpu.TStates < Spectrum48.FrameTStates)
+        while (spectrum.Cpu.TStates < SpectrumTimings.Spectrum48.FrameTStates)
         {
             spectrum.Cpu.Step();
             count++;

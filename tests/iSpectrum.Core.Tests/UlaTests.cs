@@ -71,7 +71,7 @@ public class UlaTests
 
         // Blue until the beam reaches the left border of screen line 100 (32 pixels, 16 T-states
         // before its first screen pixel), then red.
-        cpu.TStates = Ula.FirstPixelTState + (100 * Ula.LineTStates) - 16;
+        cpu.TStates = SpectrumTimings.Spectrum48.FirstPixelTState + (100 * SpectrumTimings.Spectrum48.LineTStates) - 16;
         _ula.Out(0x00FE, 0x02);
         _ula.EndFrame(_memory);
 
@@ -93,7 +93,7 @@ public class UlaTests
             spectrum.Memory.Write((ushort)address, 7 << 3);
         }
 
-        spectrum.Cpu.TStates = Ula.FirstPixelTState + (100 * Ula.LineTStates);
+        spectrum.Cpu.TStates = SpectrumTimings.Spectrum48.FirstPixelTState + (100 * SpectrumTimings.Spectrum48.LineTStates);
         spectrum.Memory.Write(ScreenLayout.AttributeAddress(0, 96), 2 << 3);
         spectrum.Ula.EndFrame(spectrum.Memory.Contents);
 
