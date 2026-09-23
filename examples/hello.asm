@@ -14,10 +14,12 @@
         DEVICE ZXSPECTRUM48
         ORG $8000
 
+CLS         EQU $0DAF           ; ROM: clear the screen
 CHAN_OPEN   EQU $1601           ; ROM: open a channel (A = 2: the upper screen)
 PRINT_CHAR  EQU $10             ; ROM: RST $10 prints the character in A
 
 start:
+        call CLS
         ld a,2
         call CHAN_OPEN
         ld hl,message
