@@ -157,4 +157,21 @@ public class DebuggerTests
         Assert.False(_debugger.IsPaused);
         Assert.Equal(0x2A, _spectrum.Memory.Read(Result));
     }
+
+    [Fact]
+    public void Attach_MovesToANewMachine_WithTheBreakpoints()
+    {
+        _debugger.SetBreakpoint(Routine);
+        var reloaded = new Spectrum48(new byte[Memory48K.RomSize]);
+        reloaded.Memory.LoadRam(Main, _spectrum.Memory.Contents.Slice(Main, 0x20));
+        reloaded.Cpu.PC = Main;
+        reloaded.Cpu.SP = 0xF000;
+
+        _debugger.Attach(reloaded);
+        RunUntilStopped();
+
+        Assert.Same(reloaded, _debugger.Machine);
+        Assert.Equal(DebugStopKind.Breakpoint, _debugger.LastStop.Kind);
+        Assert.Equal(Routine, reloaded.Cpu.PC);
+    }
 }

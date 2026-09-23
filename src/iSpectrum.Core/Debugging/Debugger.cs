@@ -49,7 +49,7 @@ public sealed class Debugger : IBusWatch
 {
     private const int AddressSpace = 0x10000;
 
-    private readonly Spectrum _machine;
+    private Spectrum _machine;
     private readonly bool[] _breakpoints = new bool[AddressSpace];
     private readonly bool[] _watchedWrites = new bool[AddressSpace];
     private readonly List<PortWatch> _portWatches = [];
@@ -92,6 +92,22 @@ public sealed class Debugger : IBusWatch
 
     /// <summary>Stops telling the machine's bus about this debugger.</summary>
     public void Detach() => _machine.Watch(null);
+
+    /// <summary>
+    /// Moves to another machine (after a reset or a reload), keeping the breakpoints and
+    /// watchpoints; the new machine starts running.
+    /// </summary>
+    public void Attach(Spectrum machine)
+    {
+        _machine.Watch(null);
+        _machine = machine;
+        machine.Watch(this);
+        IsPaused = false;
+        _runUntil = null;
+        _returnAbove = null;
+        _hit = null;
+        _leavingBreakpoint = false;
+    }
 
     public bool IsBreakpoint(ushort address) => _breakpoints[address];
 
