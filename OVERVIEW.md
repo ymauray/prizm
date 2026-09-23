@@ -183,8 +183,14 @@ Son et App :
   « generalized data » sont décodés en mémoire à l'ouverture. Formats `.PZX` et `.CSW` seuls
   non pris en charge ; pas d'écriture de cassette (`SAVE`).
 
-**Prochaine étape** : le **jalon 11**, Pentagon 128 et Beta Disk (disquettes TR-DOS `.TRD` et
-`.SCL`), pour les démos de la scène.
+Souhaitable un jour, sans échéance : le **Pentagon 128** et la **Beta Disk** (disquettes TR-DOS
+`.TRD` et `.SCL`), le format de la plupart des démos de la scène. Il faudrait le timing du
+Pentagon (frame de 71 680 T-states, sans contention), le contrôleur WD1793, et la ROM TR-DOS,
+qu'on ne peut pas fournir faute de licence de redistribution claire : l'utilisateur la mettrait
+dans `local/`.
+
+**Prochaine étape** : le plan du §7 est terminé ; la suite reste à choisir, par exemple parmi
+les points ci-dessus.
 
 ---
 
@@ -416,7 +422,6 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 | 8 | Modèle 128K | Pagination (port `0x7FFD`) + puce son AY-3-8912 — **terminé** (`jalon-8`) |
 | 9 | Débogueur intégré | Désassembleur, points d'arrêt, vue mémoire/registres — **terminé** (`jalon-9`), avec symboles et rechargement |
 | 10 | `.TZX` | Chargeurs protégés / turbo — **terminé** (`jalon-10`) : Speedlock 1, 2, 4, 7 et Alkatraz chargent |
-| 11 | Pentagon 128 + Beta Disk | Timing du Pentagon (frame de 71 680 T-states, sans contention), contrôleur WD1793, images `.TRD` et `.SCL` : les démos de la scène sur disquette tournent. ROM TR-DOS fournie par l'utilisateur dans `local/` (licence de redistribution incertaine) |
 
 ---
 
