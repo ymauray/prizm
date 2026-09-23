@@ -173,7 +173,6 @@ Son et App :
 
 ### Reste en suspens
 
-- NMI non implémentée ; +2A/+3, Pentagon et autres modèles non émulés.
 - Latence audio d'environ 90 ms, à réduire si elle gêne.
 - Tests visuels de l'ULA (`btime`, `stime`, `ulatest3`) : licence et références à trouver.
 - TZX : pas d'accélération des chargeurs (FUSE raccourcit les boucles des chargeurs qu'il
@@ -181,11 +180,15 @@ Son et App :
   « generalized data » sont décodés en mémoire à l'ouverture. Formats `.PZX` et `.CSW` seuls
   non pris en charge ; pas d'écriture de cassette (`SAVE`).
 
-Souhaitable un jour, sans échéance : le **Pentagon 128** et la **Beta Disk** (disquettes TR-DOS
-`.TRD` et `.SCL`), le format de la plupart des démos de la scène. Il faudrait le timing du
-Pentagon (frame de 71 680 T-states, sans contention), le contrôleur WD1793, et la ROM TR-DOS,
-qu'on ne peut pas fournir faute de licence de redistribution claire : l'utilisateur la mettrait
-dans `local/`.
+Souhaitable un jour, sans échéance :
+
+- les autres modèles : **+2A/+3** et **Pentagon 128**, entre autres ;
+- la **Beta Disk** (disquettes TR-DOS `.TRD` et `.SCL`), le format de la plupart des démos de la
+  scène. Il faudrait le timing du Pentagon (frame de 71 680 T-states, sans contention), le
+  contrôleur WD1793, et la ROM TR-DOS, qu'on ne peut pas fournir faute de licence de
+  redistribution claire : l'utilisateur la mettrait dans `local/` ;
+- la **NMI** (saut en `0x0066`), qui n'a d'intérêt qu'avec une interface qui s'en sert, comme le
+  Multiface.
 
 **Prochaine étape** : le plan du §7 est terminé ; la suite reste à choisir, par exemple parmi
 les points ci-dessus.
