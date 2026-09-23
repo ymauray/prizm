@@ -118,9 +118,17 @@ public sealed class Debugger : IBusWatch
     /// <summary>Stops the machine after any instruction writes to <paramref name="address"/> (even in ROM).</summary>
     public void WatchWrites(ushort address, bool enabled = true) => _watchedWrites[address] = enabled;
 
+    public bool IsWatchingWrites(ushort address) => _watchedWrites[address];
+
     public void WatchPort(PortWatch watch) => _portWatches.Add(watch);
 
-    public void ClearPortWatches() => _portWatches.Clear();
+    /// <summary>Removes every breakpoint and watchpoint.</summary>
+    public void ClearAll()
+    {
+        Array.Clear(_breakpoints);
+        Array.Clear(_watchedWrites);
+        _portWatches.Clear();
+    }
 
     public void Pause() => Stop(new DebugStop(DebugStopKind.Paused));
 
