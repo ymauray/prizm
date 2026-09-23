@@ -1,8 +1,9 @@
 # iSpectrum
 
-Émulateur ZX Spectrum 48K écrit en C# (.NET 10), pensé d'abord pour macOS sur Apple Silicon.
-Il démarre la ROM d'origine, on y tape du BASIC au clavier du Mac, le beeper se fait entendre,
-et il charge snapshots (`.SNA`, `.Z80`) et cassettes (`.TAP`), en temps réel ou instantanément.
+Émulateur ZX Spectrum **48K** et **128K** écrit en C# (.NET 10), pensé d'abord pour macOS sur
+Apple Silicon. Il démarre les ROM d'origine, on y tape du BASIC au clavier du Mac, le beeper et
+la puce son AY du 128K se font entendre, et il charge snapshots (`.SNA`, `.Z80`) et cassettes
+(`.TAP`), en temps réel ou instantanément.
 
 L'architecture, l'état d'avancement et le plan par jalons sont dans [`OVERVIEW.md`](OVERVIEW.md) ;
 les règles de contribution (y compris pour les agents de code) dans [`AGENTS.md`](AGENTS.md).
@@ -12,6 +13,12 @@ les règles de contribution (y compris pour les agents de code) dans [`AGENTS.md
 ```sh
 dotnet run --project src/iSpectrum.App
 ```
+
+## Modèles
+
+La machine démarre en 48K. **Cmd+1** allume un 48K, **Cmd+2** un 128K (qui démarre sur son
+menu : les flèches choisissent, Entrée valide), **Cmd+R** redémarre la machine en cours. Dans le
+BASIC 128, les mots-clés se tapent en toutes lettres : `PLAY "cdefgab"` fait jouer la puce AY.
 
 ## Clavier
 
@@ -36,17 +43,18 @@ tapent comme sur le Spectrum : Tab, puis Ctrl + la touche. Pour quitter, fermez 
 
 ## Snapshots et cassettes
 
-L'émulateur ouvre les snapshots `.SNA` et `.Z80` (48K) et les cassettes `.TAP` :
+L'émulateur ouvre les snapshots `.SNA` et `.Z80` (48K et 128K) et les cassettes `.TAP` :
 
 - glisser-déposer du fichier sur la fenêtre ;
 - **Cmd+O** : sélecteur de fichier (macOS ; `zenity` sous Linux) ;
 - en argument : `dotnet run --project src/iSpectrum.App -- jeu.tap`.
 
-Une cassette redémarre la machine, qui tape `LOAD ""` d'elle-même. Par défaut, elle se charge
-**en temps réel**, comme en 1983 : son de chargement, bandes de couleur dans la bordure, et
+Une cassette redémarre la machine, qui tape `LOAD ""` d'elle-même (sur le 128K, elle choisit
+« Tape Loader » dans le menu). Par défaut, elle se charge **en temps réel**, comme en 1983 : son de chargement, bandes de couleur dans la bordure, et
 quelques minutes d'attente pour un gros jeu. **Cmd+T** accélère le chargement (sans le son),
 **Cmd+L** passe au chargement **rapide** (instantané, sans signal). Le titre de la fenêtre
-indique le bloc de la cassette en cours de lecture.
+indique le bloc de la cassette en cours de lecture. Un snapshot, lui, se charge dans le
+modèle qu'il indique.
 
 **Cmd+S** sauvegarde l'état de la machine en `.SNA` dans `~/Documents/iSpectrum/`, et
 **Cmd+F** ouvre ce dossier dans le Finder. Les jeux ne doivent jamais être ajoutés au dépôt :
