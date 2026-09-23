@@ -6,8 +6,11 @@ using Raylib_cs;
 
 namespace iSpectrum.App;
 
-/// <summary>An entry of a menu, with its keyboard shortcut (Cmd + <see cref="Key"/>); an empty label is a separator.</summary>
-internal sealed record MenuItem(string Label, KeyboardKey Key, Action Execute, Func<bool>? IsChecked = null)
+/// <summary>
+/// An entry of a menu, with its keyboard shortcut (Cmd + <see cref="Key"/>, with Shift if
+/// <see cref="Shift"/>); an empty label is a separator.
+/// </summary>
+internal sealed record MenuItem(string Label, KeyboardKey Key, Action Execute, Func<bool>? IsChecked = null, bool Shift = false)
 {
     public static readonly MenuItem Separator = new(string.Empty, KeyboardKey.Null, () => { });
 
@@ -17,8 +20,8 @@ internal sealed record MenuItem(string Label, KeyboardKey Key, Action Execute, F
     public string Shortcut { get; } = Key switch
     {
         KeyboardKey.Null => string.Empty,
-        >= KeyboardKey.Zero and <= KeyboardKey.Nine => $"Cmd+{Key - KeyboardKey.Zero}",
-        _ => $"Cmd+{Key}",
+        >= KeyboardKey.Zero and <= KeyboardKey.Nine => $"Cmd+{(Shift ? "Shift+" : string.Empty)}{Key - KeyboardKey.Zero}",
+        _ => $"Cmd+{(Shift ? "Shift+" : string.Empty)}{Key}",
     };
 }
 
@@ -96,11 +99,12 @@ internal sealed class MenuBar
             return;
         }
 
+        var shift = Raylib.IsKeyDown(KeyboardKey.LeftShift) || Raylib.IsKeyDown(KeyboardKey.RightShift);
         foreach (var menu in _menus)
         {
             foreach (var item in menu.Items)
             {
-                if (item.Key != KeyboardKey.Null && Raylib.IsKeyPressed(item.Key))
+                if (item.Key != KeyboardKey.Null && item.Shift == shift && Raylib.IsKeyPressed(item.Key))
                 {
                     _open = -1;
                     item.Execute();
