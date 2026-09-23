@@ -37,12 +37,12 @@ var turbo = false;
 string? tapeName = null;
 var shownBlock = -1;
 
-// The model new machines are built as: Cmd+1 for the 48K, Cmd+2 for the 128K.
+// The model new machines are built as (Machine menu).
 var is128 = false;
 Spectrum spectrum = NewMachine();
 
 Raylib.SetConfigFlags(ConfigFlags.VSyncHint);
-Raylib.InitWindow(Ula.FrameWidth * Scale, Ula.FrameHeight * Scale, Title);
+Raylib.InitWindow(Ula.FrameWidth * Scale, (Ula.FrameHeight * Scale) + MenuBar.Height, Title);
 
 using var audio = new AudioOutput();
 Raylib.SetTargetFPS(audio.IsReady ? MaxRedrawsPerSecond : FramesPerSecond);
@@ -57,6 +57,32 @@ Raylib.UnloadImage(image);
 Raylib.SetTextureFilter(texture, TextureFilter.Point);
 
 var source = new Rectangle(0, 0, Ula.FrameWidth, Ula.FrameHeight);
+var quit = false;
+
+// Every command, with its shortcut; the menu bar shows them and answers the shortcuts too.
+var menuBar = new MenuBar(
+[
+    new Menu("File",
+    [
+        new MenuItem("Open...", KeyboardKey.O, ChooseFile),
+        new MenuItem("Save snapshot", KeyboardKey.S, SaveSnapshot),
+        new MenuItem("Show snapshot folder", KeyboardKey.F, () => HostShell.OpenFolder(snapshotFolder)),
+        MenuItem.Separator,
+        new MenuItem("Quit", KeyboardKey.Q, () => quit = true),
+    ]),
+    new Menu("Machine",
+    [
+        new MenuItem("ZX Spectrum 48K", KeyboardKey.One, () => SwitchModel(to128: false), () => !is128),
+        new MenuItem("ZX Spectrum 128K", KeyboardKey.Two, () => SwitchModel(to128: true), () => is128),
+        MenuItem.Separator,
+        new MenuItem("Reset", KeyboardKey.R, Reset),
+    ]),
+    new Menu("Tape",
+    [
+        new MenuItem("Fast loading", KeyboardKey.L, ToggleFastLoad, () => fastLoad),
+        new MenuItem("Turbo while loading", KeyboardKey.T, ToggleTurbo, () => turbo),
+    ]),
+]);
 
 // A file can be given on the command line: dotnet run --project src/iSpectrum.App -- game.tap
 if (args.Length > 0)
@@ -64,7 +90,7 @@ if (args.Length > 0)
     Open(args[0]);
 }
 
-while (!Raylib.WindowShouldClose())
+while (!Raylib.WindowShouldClose() && !quit)
 {
     if (Raylib.IsFileDropped())
     {
@@ -83,7 +109,8 @@ while (!Raylib.WindowShouldClose())
         Open(chosen);
     }
 
-    HandleShortcuts();
+    menuBar.HandleShortcuts();
+    menuBar.Update();
 
     // Keyboard events must be read on every redraw: Raylib drops them at the next one.
     keyboardInput.Update(spectrum.Keyboard);
@@ -123,8 +150,9 @@ while (!Raylib.WindowShouldClose())
     Raylib.UpdateTexture(texture, spectrum.FrameBuffer);
 
     Raylib.BeginDrawing();
-    var destination = new Rectangle(0, 0, Raylib.GetScreenWidth(), Raylib.GetScreenHeight());
+    var destination = new Rectangle(0, MenuBar.Height, Raylib.GetScreenWidth(), Raylib.GetScreenHeight() - MenuBar.Height);
     Raylib.DrawTexturePro(texture, source, destination, Vector2.Zero, 0, Color.White);
+    menuBar.Draw(Raylib.GetScreenWidth());
     Raylib.EndDrawing();
 }
 
@@ -140,51 +168,31 @@ void RunFrame()
 // Typing LOAD "" or playing the tape: what turbo speeds up.
 bool IsLoading() => spectrum.AutoTyper.IsBusy || spectrum.Tape.IsPlaying;
 
-// Cmd+S saves a snapshot, Cmd+O chooses a file to open, Cmd+F shows the snapshot folder,
-// Cmd+L switches fast tape loading, Cmd+T switches turbo, Cmd+1 and Cmd+2 power on a 48K or a
-// 128K (Cmd+M is macOS's Minimize), Cmd+R resets.
-void HandleShortcuts()
+void ChooseFile()
 {
-    if (!Raylib.IsKeyDown(KeyboardKey.LeftSuper) && !Raylib.IsKeyDown(KeyboardKey.RightSuper))
+    if (!fileChooser.IsOpen && !fileChooser.TryOpen(Directory.Exists(snapshotFolder) ? snapshotFolder : documents))
     {
-        return;
+        Report("no file chooser on this system: drop a file on the window instead");
     }
+}
 
-    if (Raylib.IsKeyPressed(KeyboardKey.S))
-    {
-        SaveSnapshot();
-    }
-    else if (Raylib.IsKeyPressed(KeyboardKey.O) && !fileChooser.IsOpen)
-    {
-        if (!fileChooser.TryOpen(Directory.Exists(snapshotFolder) ? snapshotFolder : documents))
-        {
-            Report("no file chooser on this system: drop a file on the window instead");
-        }
-    }
-    else if (Raylib.IsKeyPressed(KeyboardKey.F))
-    {
-        HostShell.OpenFolder(snapshotFolder);
-    }
-    else if (Raylib.IsKeyPressed(KeyboardKey.L))
-    {
-        fastLoad = !fastLoad;
-        spectrum.FastLoad = fastLoad;
-        Report(fastLoad ? "fast tape loading" : "real-time tape loading");
-    }
-    else if (Raylib.IsKeyPressed(KeyboardKey.T))
-    {
-        turbo = !turbo;
-        Report(turbo ? "turbo while loading" : "normal speed while loading");
-    }
-    else if (Raylib.IsKeyPressed(KeyboardKey.One) || Raylib.IsKeyPressed(KeyboardKey.Two))
-    {
-        is128 = Raylib.IsKeyPressed(KeyboardKey.Two);
-        Reset();
-    }
-    else if (Raylib.IsKeyPressed(KeyboardKey.R))
-    {
-        Reset();
-    }
+void SwitchModel(bool to128)
+{
+    is128 = to128;
+    Reset();
+}
+
+void ToggleFastLoad()
+{
+    fastLoad = !fastLoad;
+    spectrum.FastLoad = fastLoad;
+    Report(fastLoad ? "fast tape loading" : "real-time tape loading");
+}
+
+void ToggleTurbo()
+{
+    turbo = !turbo;
+    Report(turbo ? "turbo while loading" : "normal speed while loading");
 }
 
 bool CanOpen(string path) => Snapshot.IsSupported(path) || IsTape(path);
