@@ -23,7 +23,9 @@ jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`
 (2020, `.tap`).
 
 Depuis le jalon 11, hors jalon, directement sur `main` : latence audio réduite (callback de la
-carte son), `SAVE` vers un `.TAP`, menu du bloc TZX « select », démarrage en 128K.
+carte son), `SAVE` vers un `.TAP`, menu du bloc TZX « select », démarrage en 128K, renommage du
+projet en Prizm, publication sur GitHub (`ymauray/prizm`), chaîne CI/CD multiplateforme GitHub
+Actions, fichiers communautaires et protection de branche.
 
 ### Ce qui existe
 
