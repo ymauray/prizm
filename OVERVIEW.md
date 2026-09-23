@@ -38,7 +38,8 @@ jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`
   - `Keyboard`, `SpectrumKey`, `SpectrumCharacters`, `AutoTyper`, `ScreenLayout`, `Palette` ;
   - `Tape/` : `TapFile`, `TzxFile` (tous les blocs de TZX 1.20), `TapeImage` et `TapeBlock`
     (la cassette, quel que soit le format), `TapeCursor` (parcours front par front : boucles,
-    sauts, appels), `TapePlayer` (le lecteur, et la détection de chargeur) ; `Snapshots/` :
+    sauts, appels), `TapePlayer` (le lecteur, et la détection de chargeur), `TapeRecorder`
+    (les blocs sauvegardés par la ROM) ; `Snapshots/` :
     `SnaFormat`, `Z80Format`, `Snapshot` ;
   - `Debugging/` : `Debugger` (pause, pas à pas, points d'arrêt et surveillances),
     `SymbolTable` (fichiers de symboles), `DebuggerCommands` (ligne de commande).
@@ -70,7 +71,9 @@ jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`
   l'éditeur du BASIC 128), `BEEP 1,0` (hauteur vérifiée), `PLAY "c"` dans le BASIC
   128, `LOAD ""` depuis le signal et en mode rapide (48K, et « Tape Loader » du 128K), depuis
   un `.TZX` (blocs d'information, bloc d'arrêt, bloc turbo joué en temps réel en mode rapide),
-  un programme BASIC qui survit à une sauvegarde puis un chargement dans chaque format.
+  un programme BASIC qui survit à une sauvegarde puis un chargement dans chaque format ;
+  `SAVE` (en-tête et données identiques à ceux attendus, relus sur une autre machine, dans le
+  BASIC 48 et le BASIC 128) et `SA-BYTES` appelé depuis du code machine.
 - Timing (Richard Butler) : 72 tests de durée d'instructions et de bus flottant, comparés aux
   mesures sur machine réelle ; ignorés si `local/timing-tests/` est absent.
 
@@ -120,7 +123,12 @@ Timings et ULA :
   deux ; volumes d'après la table mesurée d'ayumi (MIT). Registres 14-15 (ports d'E/S : RS-232,
   pavé numérique) non reliés.
 - Chargement de cassette : « Tape Loader » du menu (ENTRÉE après 150 frames) ; les interceptions
-  de `LD-BYTES` ne s'appliquent que quand la ROM 1 est paginée.
+  de `LD-BYTES` et de `SA-BYTES` ne s'appliquent que quand la ROM 1 est paginée.
+- Sauvegarde sur cassette toujours instantanée, comme le piège de FUSE : `SA-BYTES` est
+  intercepté à `SA-FLAG` (`0x04D0`, drapeau dans A, début dans IX, longueur dans DE), le bloc
+  complet part dans `TapeRecorder`, et la ROM reprend au `RET` de `0x053E`. L'App ajoute chaque
+  bloc à un `.TAP` de `~/Documents/iSpectrum/` nommé d'après le premier en-tête, comme une
+  cassette restée en enregistrement ; **Tape > New recording** en commence une autre.
 
 Débogueur :
 
@@ -177,8 +185,9 @@ Son et App :
 - Tests visuels de l'ULA (`btime`, `stime`, `ulatest3`) : licence et références à trouver.
 - TZX : pas d'accélération des chargeurs (FUSE raccourcit les boucles des chargeurs qu'il
   reconnaît ; ici, seul le turbo accélère) ; bloc « select » (`0x28`) ignoré ; les blocs CSW et
-  « generalized data » sont décodés en mémoire à l'ouverture. Formats `.PZX` et `.CSW` seuls
-  non pris en charge ; pas d'écriture de cassette (`SAVE`).
+  « generalized data » sont décodés en mémoire à l'ouverture.
+- `SAVE` passe par la ROM seulement : un programme qui sauvegarde avec sa propre routine
+  (sans `SA-BYTES`) n'enregistre rien, faute de capture du signal MIC.
 
 Souhaitable un jour, sans échéance :
 
@@ -187,6 +196,8 @@ Souhaitable un jour, sans échéance :
   scène. Il faudrait le timing du Pentagon (frame de 71 680 T-states, sans contention), le
   contrôleur WD1793, et la ROM TR-DOS, qu'on ne peut pas fournir faute de licence de
   redistribution claire : l'utilisateur la mettrait dans `local/` ;
+- les formats de cassette **`.CSW`** (signal brut, déjà décodé dans le bloc TZX `0x18`) et
+  **`.PZX`** ;
 - la **NMI** (saut en `0x0066`), qui n'a d'intérêt qu'avec une interface qui s'en sert, comme le
   Multiface.
 

@@ -20,9 +20,9 @@ Une barre de menu, en haut de la fenêtre, réunit toutes les commandes avec leu
 
 | Menu | Commandes |
 |---|---|
-| **File** | Open... (Cmd+O), Save snapshot (Cmd+S), Show snapshot folder (Cmd+F), Quit (Cmd+Q) |
+| **File** | Open... (Cmd+O), Save snapshot (Cmd+S), Show saved files (Cmd+F), Quit (Cmd+Q) |
 | **Machine** | ZX Spectrum 48K (Cmd+1), ZX Spectrum 128K (Cmd+2), Reset (Cmd+R) |
-| **Tape** | Insert tape... (Cmd+Shift+O), Play / Stop (Cmd+Shift+P), Rewind, Fast loading (Cmd+L), Turbo while loading (Cmd+T) |
+| **Tape** | Insert tape... (Cmd+Shift+O), Play / Stop (Cmd+Shift+P), Rewind, New recording, Fast loading (Cmd+L), Turbo while loading (Cmd+T) |
 | **Debug** | Show debugger (Cmd+D), Pause / Continue (Cmd+P), Step into (Cmd+I), Step over (Cmd+N), Step out (Cmd+U) |
 | **Help** | About iSpectrum (licence et copyright des ROM) |
 
@@ -87,7 +87,13 @@ tape...** (Cmd+Shift+O) met une autre cassette dans le lecteur sans redémarrer 
 contrairement à **File > Open**.
 
 **Cmd+S** sauvegarde l'état de la machine en `.SNA` dans `~/Documents/iSpectrum/`, et
-**Cmd+F** ouvre ce dossier dans le Finder. Les jeux ne doivent jamais être ajoutés au dépôt :
+**Cmd+F** ouvre ce dossier dans le Finder.
+
+`SAVE` enregistre dans ce même dossier, instantanément, dans un `.TAP` nommé d'après le
+programme (`SAVE "jeu"` crée `jeu.tap`). Comme sur une cassette laissée en enregistrement, les
+`SAVE` suivants s'ajoutent au même fichier ; **Tape > New recording** fait commencer le
+prochain dans un nouveau fichier. Un programme qui appelle la routine `SA-BYTES` de la ROM
+(`0x04C2`) est enregistré de la même façon. Les jeux ne doivent jamais être ajoutés au dépôt :
 rangez vos fichiers personnels dans `local/`, ignoré par Git.
 
 ## Écrire ses programmes

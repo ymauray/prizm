@@ -29,6 +29,16 @@ public class TapFileTests
         Assert.Throws<InvalidDataException>(() => TapFile.Parse(data));
 
     [Fact]
+    public void WriteBlock_WritesWhatParseReads()
+    {
+        using var file = new MemoryStream();
+        TapFile.WriteBlock(file, [0x00, 0x41, 0x41]);
+        TapFile.WriteBlock(file, [0xFF, 0xFF]);
+
+        Assert.Equal(new byte[] { 0x03, 0x00, 0x00, 0x41, 0x41, 0x02, 0x00, 0xFF, 0xFF }, file.ToArray());
+    }
+
+    [Fact]
     public void MakeBlock_AddsFlagAndChecksum()
     {
         var block = TapFile.MakeBlock(0xFF, [0x12, 0x34]);
