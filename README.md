@@ -23,6 +23,9 @@ Une barre de menu, en haut de la fenêtre, réunit toutes les commandes avec leu
 | **File** | Open... (Cmd+O), Save snapshot (Cmd+S), Show snapshot folder (Cmd+F), Quit (Cmd+Q) |
 | **Machine** | ZX Spectrum 48K (Cmd+1), ZX Spectrum 128K (Cmd+2), Reset (Cmd+R) |
 | **Tape** | Fast loading (Cmd+L), Turbo while loading (Cmd+T) |
+| **Debug** | Show debugger (Cmd+D), Pause / Continue (Cmd+P), Step into (Cmd+I), Step over (Cmd+N), Step out (Cmd+U) |
+
+**File > Reload** (Cmd+Shift+R) rouvre le dernier fichier ouvert.
 
 Les coches indiquent le modèle en cours et les options actives. Les libellés sont en anglais :
 la police intégrée de Raylib n'a pas de lettres accentuées.
@@ -73,6 +76,46 @@ modèle qu'il indique.
 **Cmd+S** sauvegarde l'état de la machine en `.SNA` dans `~/Documents/iSpectrum/`, et
 **Cmd+F** ouvre ce dossier dans le Finder. Les jeux ne doivent jamais être ajoutés au dépôt :
 rangez vos fichiers personnels dans `local/`, ignoré par Git.
+
+## Écrire ses programmes
+
+iSpectrum est pensé pour développer en assembleur Z80 avec
+[sjasmplus](https://github.com/z00m128/sjasmplus). L'exemple `examples/hello.asm` affiche un
+message par la ROM :
+
+```sh
+mkdir -p local/build && cd local/build
+sjasmplus --sym=hello.sym ../../examples/hello.asm
+```
+
+sjasmplus écrit dans le dossier courant `hello.sna` (un snapshot, pour développer : il se charge
+instantanément et démarre sur `start`), `hello.tap` (une cassette, pour partager ; elle contient
+presque toute la RAM et se charge lentement en temps réel) et `hello.sym` (les symboles).
+Ouvrez `hello.sna` : le fichier `hello.sym` voisin est chargé avec lui. Après chaque
+modification, réassemblez puis faites **Cmd+Shift+R** : le programme est rechargé, en gardant
+les points d'arrêt.
+
+## Débogueur
+
+**Cmd+D** affiche le débogueur : l'image passe en taille double, avec la mémoire et une ligne
+de commande en dessous, et à droite l'état, les registres, les drapeaux, le désassemblage (avec
+les symboles) et les points d'arrêt, dans la police du Spectrum. Un clic sur une ligne du
+désassemblage pose ou retire un point d'arrêt (`*`). Pendant une pause, l'écran montre la
+mémoire telle qu'elle est à cet instant, et le clavier va à la ligne de commande :
+
+| Commande | Effet |
+|---|---|
+| `s`, `n`, `u`, `c`, `p` | pas à pas, pas par-dessus (CALL, RST, DJNZ, LDIR…), sortie de routine, reprise, pause |
+| `b ADRESSE` | pose ou retire un point d'arrêt |
+| `w ADRESSE` | arrête après toute écriture à cette adresse |
+| `pr PORT`, `pw PORT` | arrête après une lecture ou une écriture de port (`$FE` : tout port pair de l'ULA) |
+| `clear` | retire tous les points d'arrêt et surveillances |
+| `m ADRESSE`, `d [ADRESSE]` | vue mémoire ; désassemblage à partir d'une adresse (seul : suit PC) |
+
+Une adresse s'écrit `$8000`, `0x8000`, `8000h`, `32768`, ou avec un symbole : `start`,
+`start.next`, `score+1`. Le désassembleur ne sait pas distinguer le code des données : les
+octets qui suivent une étiquette de données (comme `message`) s'affichent comme des
+instructions ; la vue mémoire les montre tels quels.
 
 ## Tester
 

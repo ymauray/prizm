@@ -11,8 +11,9 @@ GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
 
 ## 0. État d'avancement
 
-**Jalons 1 à 8 terminés** (tags Git `jalon-1` à `jalon-8`) : iSpectrum émule le ZX Spectrum
-**48K** et le **128K** (mémoire paginée, puce son AY-3-8912). On y tape du BASIC au clavier du
+**Jalons 1 à 9 terminés** (tags Git `jalon-1` à `jalon-9`) : iSpectrum émule le ZX Spectrum
+**48K** et le **128K** (mémoire paginée, puce son AY-3-8912), avec un **débogueur intégré**
+pensé pour développer en assembleur (sjasmplus, symboles, rechargement en une touche). On y tape du BASIC au clavier du
 Mac, le son sort, il charge et sauvegarde des snapshots `.SNA` et `.Z80`, charge des cassettes
 `.TAP` en temps réel (son et bandes dans la bordure) ou instantanément, et reproduit la
 contention mémoire et le bus flottant de l'ULA, avec une image dessinée au fil du faisceau. Deux
@@ -25,7 +26,7 @@ jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`
   `DDCB`, `FDCB`, opcodes non documentés, bits 3 et 5 des drapeaux, MEMPTR, registre interne
   « Q » ; interruptions IM 0/1/2, `HALT`, retard après `EI` ; un point de contention à chaque
   cycle de bus (`IMemory.ContentionDelay`, `IMemory.IsContended`, `IIo.ContentionDelay`, 0 par
-  défaut).
+  défaut) ; `Z80Disassembler` (toutes les instructions, symboles).
 - `src/iSpectrum.Core`, la machine :
   - `Spectrum` (base commune : CPU, ULA, cassette, boucle de frame, `Step`, chargement rapide,
     mode `Headless`), `Spectrum48`, `Spectrum128` ;
@@ -34,16 +35,24 @@ jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`
   - `Ula` (port `0xFE` : clavier, EAR, bordure, haut-parleur ; bus flottant ; image) ;
   - `Beeper` (mélangeur : haut-parleur, cassette, AY), `ISoundSource`, `Ay8912` ;
   - `Keyboard`, `SpectrumKey`, `SpectrumCharacters`, `AutoTyper`, `ScreenLayout`, `Palette` ;
-  - `Tape/` : `TapFile`, `TapePlayer` ; `Snapshots/` : `SnaFormat`, `Z80Format`, `Snapshot`.
+  - `Tape/` : `TapFile`, `TapePlayer` ; `Snapshots/` : `SnaFormat`, `Z80Format`, `Snapshot` ;
+  - `Debugging/` : `Debugger` (pause, pas à pas, points d'arrêt et surveillances),
+    `SymbolTable` (fichiers de symboles), `DebuggerCommands` (ligne de commande).
 - `src/iSpectrum.App` : fenêtre Raylib-cs (image ×3 sous une barre de menu) ; `MenuBar` (menus
-  File, Machine, Tape dessinés dans la fenêtre ; menus et raccourcis partagent une seule liste
-  de commandes), `KeyboardInput` (clavier du Mac traduit), `AudioOutput` (son, et cadence de
+  File, Machine, Tape, Debug dessinés dans la fenêtre ; menus et raccourcis partagent une seule
+  liste de commandes), `DebuggerPanel` et `SpectrumFont` (le débogueur, dans la police de la
+  ROM), `KeyboardInput` (clavier du Mac traduit), `AudioOutput` (son, et cadence de
   l'émulation), `HostShell` (sélecteur de fichier, Finder). Messages dans le titre de la fenêtre.
+- `examples/hello.asm` : premier programme pour sjasmplus (snapshot, cassette et symboles).
 
 ### Tests
 
 - CPU : suite FUSE (1356 tests, événements de bus compris), ZEXDOC, ZEXALL et les six programmes
-  de z80test (catégorie `Slow`), interruptions.
+  de z80test (catégorie `Slow`), interruptions ; désassembleur (57 textes attendus, et 1792
+  opcodes dont la longueur est vérifiée en les exécutant sur le CPU).
+- Débogueur : pas à pas, pas par-dessus, sortie de routine, points d'arrêt, surveillances
+  mémoire et port, changement de machine ; symboles lus dans un vrai fichier de sjasmplus ;
+  ligne de commande.
 - Machine : adressage écran, attributs, bordure au fil du faisceau, contention, bus flottant,
   mémoire 48K et 128K (pagination, verrou, banques contendues), clavier, beeper, AY (registres,
   hauteur, enveloppes), cassette (fronts du signal), snapshots des deux modèles, mode sans
@@ -103,6 +112,23 @@ Timings et ULA :
 - Chargement de cassette : « Tape Loader » du menu (ENTRÉE après 150 frames) ; les interceptions
   de `LD-BYTES` ne s'appliquent que quand la ROM 1 est paginée.
 
+Débogueur :
+
+- Il fait tourner la machine à la place de l'App (`Debugger.RunFrame`), instruction par
+  instruction. Un point d'arrêt arrête avant l'instruction ; une surveillance (écriture mémoire,
+  même en ROM ; accès à un port selon un masque) arrête après, en disant quelle instruction a
+  fait l'accès. Pas par-dessus et sortie de routine ne bloquent pas : ils posent un arrêt
+  temporaire et laissent tourner la machine, qui reste affichée.
+- Les « crochets » de surveillance (mémoire, ports) ne coûtent qu'un test de référence nulle
+  quand aucun débogueur n'est attaché. `Spectrum.Step` indique la fin d'une frame.
+- Pendant une pause, l'image est redessinée depuis la mémoire courante (`Ula.DrawNow`), sans
+  tenir compte du faisceau.
+- Le désassemblage part de PC (ou d'une adresse choisie) : remonter en arrière dans du code
+  machine est ambigu. Le code et les données ne se distinguent pas.
+- Symboles : lignes `nom: EQU 0x…` (sjasmplus), `nom EQU …h`, `nom = $…` (z88dk) ; un symbole
+  sans point l'emporte sur une étiquette locale pour la même adresse. Le fichier `.sym` voisin
+  du fichier ouvert est chargé automatiquement.
+
 Son et App :
 
 - Mélange dans `Beeper` : haut-parleur (bit 4 du port `0xFE`, MIC ignoré), cassette à mi-volume,
@@ -133,8 +159,8 @@ Son et App :
 - Tests visuels de l'ULA (`btime`, `stime`, `ulatest3`) : licence et références à trouver.
 - Pas encore de fenêtre « À propos » (copyright Amstrad : `README.md` et `roms/README.md`).
 
-**Prochaine étape** : le **jalon 9**, débogueur intégré (désassembleur, points d'arrêt, vue
-mémoire et registres).
+**Prochaine étape** : le **jalon 10**, format de cassette `.TZX` (chargeurs protégés et turbo),
+qui s'appuiera sur le signal de cassette du jalon 6.
 
 ---
 
@@ -327,7 +353,7 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 | 6 | `.TAP` : signal réel et chargement rapide | Chargement des cassettes courantes, avec son et bandes — **terminé** (`jalon-6`) |
 | 7 | Contention mémoire + rendu ligne par ligne | Démos et effets de bordure corrects — **terminé** (`jalon-7`), validation fine par des suites de test à venir |
 | 8 | Modèle 128K | Pagination (port `0x7FFD`) + puce son AY-3-8912 — **terminé** (`jalon-8`) |
-| 9 | Débogueur intégré | Désassembleur, points d'arrêt, vue mémoire/registres |
+| 9 | Débogueur intégré | Désassembleur, points d'arrêt, vue mémoire/registres — **terminé** (`jalon-9`), avec symboles et rechargement |
 | 10 | `.TZX` | Chargeurs protégés / turbo (le signal de cassette existe depuis le jalon 6) |
 
 ---
