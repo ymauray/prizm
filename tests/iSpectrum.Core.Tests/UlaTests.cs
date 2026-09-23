@@ -83,6 +83,27 @@ public class UlaTests
     }
 
     [Fact]
+    public void ScreenWrite_WhileTheBeamIsOnScreen_ChangesOnlyTheLinesBelowIt()
+    {
+        // White paper everywhere, except that character row 12 (pixel lines 96-103) turns red
+        // when the beam starts pixel line 100: lines 96-99 keep the old colour.
+        var spectrum = new Spectrum48(new byte[Memory48K.RomSize]);
+        for (var address = 0x5800; address < 0x5B00; address++)
+        {
+            spectrum.Memory.Write((ushort)address, 7 << 3);
+        }
+
+        spectrum.Cpu.TStates = Ula.FirstPixelTState + (100 * Ula.LineTStates);
+        spectrum.Memory.Write(ScreenLayout.AttributeAddress(0, 96), 2 << 3);
+        spectrum.Ula.EndFrame(spectrum.Memory.Contents);
+
+        uint ScreenPixel(int y) => spectrum.FrameBuffer[((y + Ula.BorderTop) * Ula.FrameWidth) + Ula.BorderLeft];
+        Assert.Equal(Color(7), ScreenPixel(99));
+        Assert.Equal(Color(2), ScreenPixel(100));
+        Assert.Equal(Color(2), ScreenPixel(103));
+    }
+
+    [Fact]
     public void BorderChanges_StartOverAtTheNextFrame()
     {
         _ula.Out(0x00FE, 0x04);

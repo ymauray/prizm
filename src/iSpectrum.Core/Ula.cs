@@ -10,12 +10,14 @@ namespace iSpectrum.Core;
 /// The ULA: port 0xFE (keyboard, border and speaker) and the video output.
 /// </summary>
 /// <remarks>
-/// The frame is rendered at its end. The screen area is drawn from the memory as it is then; the
-/// border follows the beam: each border change is stamped with the CPU's T-state count, and each
-/// border pixel takes the colour in effect when the beam drew it, which shows the stripes of tape
-/// loading. Drawing the screen area line by line too comes with contention (milestone 7).
+/// The picture follows the beam. Border changes are stamped with the CPU's T-state count, and
+/// each border pixel takes the colour in effect when the beam drew it (the stripes of tape
+/// loading). The screen area is drawn lazily: just before the CPU writes to the screen memory,
+/// everything the beam has already drawn is rendered from the memory as it was, so changes made
+/// while the beam is on screen appear only below it. The rest is drawn at the end of the frame.
+/// A group of 8 pixels shows the writes made up to the T-state of its first pixel.
 /// </remarks>
-public sealed class Ula : IIo
+public sealed class Ula : IIo, IScreenWriteObserver
 {
     public const int BorderLeft = 32;
     public const int BorderTop = 32;
@@ -42,6 +44,14 @@ public sealed class Ula : IIo
     private int _border;
     private int _frameCount;
 
+    // Rendering position in beam order: the next pixel to draw, the next border change to
+    // apply, and the border colour in effect there.
+    private int _row;
+    private int _column;
+    private int _nextBorderChange;
+    private uint _borderColor = Palette.Colors[0];
+    private bool _flashInverted;
+
     private Z80Cpu? _cpu;
 
     /// <summary>The key matrix read through port 0xFE.</summary>
@@ -65,6 +75,8 @@ public sealed class Ula : IIo
             _border = value & 0x07;
             _frameStartBorder = _border;
             _borderChangeCount = 0;
+            _nextBorderChange = 0;
+            _borderColor = Palette.Colors[_border];
         }
     }
 
@@ -90,6 +102,16 @@ public sealed class Ula : IIo
 
     /// <summary>Gives the ULA the CPU whose T-state count stamps border and speaker changes.</summary>
     public void Connect(Z80Cpu cpu) => _cpu = cpu;
+
+    /// <summary>Contended I/O points wait like contended memory (see <see cref="Contention48K"/>).</summary>
+    public int ContentionDelay(ushort port, long tStates) => Contention48K.Delay(tStates);
+
+    /// <summary>
+    /// Draws what the beam has shown so far, before the CPU changes the screen memory. A pixel
+    /// drawn at the very T-state of the write shows the new value: the real ULA reads its bytes a
+    /// little before it displays them.
+    /// </summary>
+    void IScreenWriteObserver.BeforeScreenWrite(ReadOnlySpan<byte> memory) => RenderUpTo((_cpu?.TStates ?? 0) - 1, memory);
 
     /// <summary>
     /// Bits 0-2 set the border, bit 4 the speaker. Bit 3 (MIC) also reaches the speaker on real
@@ -136,78 +158,79 @@ public sealed class Ula : IIo
         Tape.EndFrame(frameTStates);
     }
 
-    /// <summary>Renders the frame, then starts the next one: FLASH counter, border changes.</summary>
+    /// <summary>Finishes drawing the frame, then starts the next one: FLASH counter, border changes.</summary>
     public void EndFrame(ReadOnlySpan<byte> memory)
     {
-        Render(memory);
+        RenderUpTo(long.MaxValue, memory);
+
         _frameCount++;
         _frameStartBorder = _border;
         _borderChangeCount = 0;
-    }
-
-    private void Render(ReadOnlySpan<byte> memory)
-    {
-        var flashInverted = (_frameCount / FlashPeriod % 2) == 1;
-
-        // Border pixels are visited in beam order, so the changes are walked once, in order.
-        var change = 0;
-        var border = Palette.Colors[_frameStartBorder];
-
-        for (var row = 0; row < FrameHeight; row++)
-        {
-            var line = _frameBuffer.AsSpan(row * FrameWidth, FrameWidth);
-            var y = row - BorderTop;
-            var lineStart = FirstPixelTState + ((long)y * LineTStates);
-
-            if (y is < 0 or >= ScreenLayout.Height)
-            {
-                PaintBorder(line, 0, FrameWidth, lineStart, ref change, ref border);
-                continue;
-            }
-
-            PaintBorder(line, 0, BorderLeft, lineStart, ref change, ref border);
-
-            for (var x = 0; x < ScreenLayout.Width; x += 8)
-            {
-                var pixels = memory[ScreenLayout.PixelAddress(x, y)];
-                var attribute = memory[ScreenLayout.AttributeAddress(x, y)];
-                var bright = (attribute & 0x40) != 0;
-                var ink = Palette.Colors[Palette.Index(attribute & 0x07, bright)];
-                var paper = Palette.Colors[Palette.Index((attribute >> 3) & 0x07, bright)];
-
-                if ((attribute & 0x80) != 0 && flashInverted)
-                {
-                    (ink, paper) = (paper, ink);
-                }
-
-                var cell = line.Slice(BorderLeft + x, 8);
-                for (var bit = 0; bit < 8; bit++)
-                {
-                    cell[bit] = (pixels & (0x80 >> bit)) != 0 ? ink : paper;
-                }
-            }
-
-            PaintBorder(line, BorderLeft + ScreenLayout.Width, BorderLeft, lineStart, ref change, ref border);
-        }
+        _nextBorderChange = 0;
+        _borderColor = Palette.Colors[_border];
+        _flashInverted = (_frameCount / FlashPeriod % 2) == 1;
+        _row = 0;
+        _column = 0;
     }
 
     /// <summary>
-    /// Paints <paramref name="count"/> border pixels from <paramref name="first"/>, each with the
-    /// colour in effect when the beam reached it. <paramref name="lineStart"/> is the T-state of
-    /// the line's first screen-area pixel; the left border comes before it.
+    /// Draws, in beam order, every pixel the beam reaches at or before <paramref name="time"/>:
+    /// border pixels one by one, screen pixels by groups of 8 (4 T-states).
     /// </summary>
-    private void PaintBorder(Span<uint> line, int first, int count, long lineStart, ref int change, ref uint color)
+    private void RenderUpTo(long time, ReadOnlySpan<byte> memory)
     {
-        for (var x = first; x < first + count; x++)
+        for (; _row < FrameHeight; _row++, _column = 0)
         {
-            var time = lineStart + ((x - BorderLeft) >> 1);
-            while (change < _borderChangeCount && _borderChangeTimes[change] <= time)
-            {
-                color = Palette.Colors[_borderChangeColors[change]];
-                change++;
-            }
+            var y = _row - BorderTop;
+            var lineStart = FirstPixelTState + ((long)y * LineTStates);
+            var screenLine = y is >= 0 and < ScreenLayout.Height;
+            var line = _frameBuffer.AsSpan(_row * FrameWidth, FrameWidth);
 
-            line[x] = color;
+            while (_column < FrameWidth)
+            {
+                var pixelTime = lineStart + ((_column - BorderLeft) >> 1);
+                if (pixelTime > time)
+                {
+                    return;
+                }
+
+                var x = _column - BorderLeft;
+                if (screenLine && x is >= 0 and < ScreenLayout.Width)
+                {
+                    DrawCell(line.Slice(_column, 8), x, y, memory);
+                    _column += 8;
+                }
+                else
+                {
+                    while (_nextBorderChange < _borderChangeCount && _borderChangeTimes[_nextBorderChange] <= pixelTime)
+                    {
+                        _borderColor = Palette.Colors[_borderChangeColors[_nextBorderChange]];
+                        _nextBorderChange++;
+                    }
+
+                    line[_column] = _borderColor;
+                    _column++;
+                }
+            }
+        }
+    }
+
+    private void DrawCell(Span<uint> cell, int x, int y, ReadOnlySpan<byte> memory)
+    {
+        var pixels = memory[ScreenLayout.PixelAddress(x, y)];
+        var attribute = memory[ScreenLayout.AttributeAddress(x, y)];
+        var bright = (attribute & 0x40) != 0;
+        var ink = Palette.Colors[Palette.Index(attribute & 0x07, bright)];
+        var paper = Palette.Colors[Palette.Index((attribute >> 3) & 0x07, bright)];
+
+        if ((attribute & 0x80) != 0 && _flashInverted)
+        {
+            (ink, paper) = (paper, ink);
+        }
+
+        for (var bit = 0; bit < 8; bit++)
+        {
+            cell[bit] = (pixels & (0x80 >> bit)) != 0 ? ink : paper;
         }
     }
 }
