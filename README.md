@@ -3,7 +3,7 @@
 Émulateur ZX Spectrum **48K** et **128K** écrit en C# (.NET 10), pensé d'abord pour macOS sur
 Apple Silicon. Il démarre les ROM d'origine, on y tape du BASIC au clavier du Mac, le beeper et
 la puce son AY du 128K se font entendre, et il charge snapshots (`.SNA`, `.Z80`) et cassettes
-(`.TAP`), en temps réel ou instantanément.
+(`.TAP`, `.TZX`), en temps réel ou instantanément, y compris les chargeurs turbo et protégés.
 
 L'architecture, l'état d'avancement et le plan par jalons sont dans [`OVERVIEW.md`](OVERVIEW.md) ;
 les règles de contribution (y compris pour les agents de code) dans [`AGENTS.md`](AGENTS.md).
@@ -22,7 +22,7 @@ Une barre de menu, en haut de la fenêtre, réunit toutes les commandes avec leu
 |---|---|
 | **File** | Open... (Cmd+O), Save snapshot (Cmd+S), Show snapshot folder (Cmd+F), Quit (Cmd+Q) |
 | **Machine** | ZX Spectrum 48K (Cmd+1), ZX Spectrum 128K (Cmd+2), Reset (Cmd+R) |
-| **Tape** | Fast loading (Cmd+L), Turbo while loading (Cmd+T) |
+| **Tape** | Play / Stop (Cmd+Shift+P), Rewind, Fast loading (Cmd+L), Turbo while loading (Cmd+T) |
 | **Debug** | Show debugger (Cmd+D), Pause / Continue (Cmd+P), Step into (Cmd+I), Step over (Cmd+N), Step out (Cmd+U) |
 
 **File > Reload** (Cmd+Shift+R) rouvre le dernier fichier ouvert.
@@ -59,7 +59,8 @@ tapent comme sur le Spectrum : Tab, puis Ctrl + la touche. Pour quitter, fermez 
 
 ## Snapshots et cassettes
 
-L'émulateur ouvre les snapshots `.SNA` et `.Z80` (48K et 128K) et les cassettes `.TAP` :
+L'émulateur ouvre les snapshots `.SNA` et `.Z80` (48K et 128K) et les cassettes `.TAP` et
+`.TZX` :
 
 - glisser-déposer du fichier sur la fenêtre ;
 - **Cmd+O** : sélecteur de fichier (macOS ; `zenity` sous Linux) ;
@@ -69,9 +70,16 @@ Une cassette redémarre la machine, qui tape `LOAD ""` d'elle-même (sur le 128K
 « Tape Loader » dans le menu). Par défaut, elle se charge **en temps réel**, comme en 1983 : son de chargement, bandes de couleur dans la bordure, et
 quelques minutes d'attente pour un gros jeu. **Turbo while loading** (Cmd+T) joue la cassette en accéléré, sans le son ; **Fast loading**
 (Cmd+L) la court-circuite et copie chaque bloc en mémoire (instantané, sans signal, mais
-seulement pour les programmes qui chargent par la ROM). Le titre de la fenêtre
+seulement pour les blocs que la ROM charge à sa vitesse). Le titre de la fenêtre
 indique le bloc de la cassette en cours de lecture. Un snapshot, lui, se charge dans le
 modèle qu'il indique.
+
+Une cassette `.TZX` décrit aussi les chargeurs turbo et protégés (Speedlock, Alkatraz…) : leurs
+blocs se chargent toujours en temps réel, même en chargement rapide, et **Turbo while loading**
+les accélère. La cassette démarre d'elle-même quand la ROM ou un chargeur écoute le signal, et
+s'arrête aux blocs qui le demandent (entre deux niveaux, par exemple). Si un programme attend
+qu'on relance la cassette sans l'écouter, **Tape > Play / Stop** (Cmd+Shift+P) la relance ;
+**Tape > Rewind** la rembobine.
 
 **Cmd+S** sauvegarde l'état de la machine en `.SNA` dans `~/Documents/iSpectrum/`, et
 **Cmd+F** ouvre ce dossier dans le Finder. Les jeux ne doivent jamais être ajoutés au dépôt :

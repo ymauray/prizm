@@ -11,11 +11,12 @@ GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
 
 ## 0. État d'avancement
 
-**Jalons 1 à 9 terminés** (tags Git `jalon-1` à `jalon-9`) : iSpectrum émule le ZX Spectrum
+**Jalons 1 à 10 terminés** (tags Git `jalon-1` à `jalon-10`) : iSpectrum émule le ZX Spectrum
 **48K** et le **128K** (mémoire paginée, puce son AY-3-8912), avec un **débogueur intégré**
 pensé pour développer en assembleur (sjasmplus, symboles, rechargement en une touche). On y tape du BASIC au clavier du
 Mac, le son sort, il charge et sauvegarde des snapshots `.SNA` et `.Z80`, charge des cassettes
-`.TAP` en temps réel (son et bandes dans la bordure) ou instantanément, et reproduit la
+`.TAP` et `.TZX` en temps réel (son et bandes dans la bordure) ou instantanément, chargeurs
+turbo et protégés compris (essayés : Speedlock 1, 2, 4 et 7, Alkatraz), et reproduit la
 contention mémoire et le bus flottant de l'ULA, avec une image dessinée au fil du faisceau. Deux
 jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`) et *Corona-V*
 (2020, `.tap`).
@@ -35,7 +36,10 @@ jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`
   - `Ula` (port `0xFE` : clavier, EAR, bordure, haut-parleur ; bus flottant ; image) ;
   - `Beeper` (mélangeur : haut-parleur, cassette, AY), `ISoundSource`, `Ay8912` ;
   - `Keyboard`, `SpectrumKey`, `SpectrumCharacters`, `AutoTyper`, `ScreenLayout`, `Palette` ;
-  - `Tape/` : `TapFile`, `TapePlayer` ; `Snapshots/` : `SnaFormat`, `Z80Format`, `Snapshot` ;
+  - `Tape/` : `TapFile`, `TzxFile` (tous les blocs de TZX 1.20), `TapeImage` et `TapeBlock`
+    (la cassette, quel que soit le format), `TapeCursor` (parcours front par front : boucles,
+    sauts, appels), `TapePlayer` (le lecteur, et la détection de chargeur) ; `Snapshots/` :
+    `SnaFormat`, `Z80Format`, `Snapshot` ;
   - `Debugging/` : `Debugger` (pause, pas à pas, points d'arrêt et surveillances),
     `SymbolTable` (fichiers de symboles), `DebuggerCommands` (ligne de commande).
 - `src/iSpectrum.App` : fenêtre Raylib-cs (image ×3 sous une barre de menu) ; `MenuBar` (menus
@@ -55,12 +59,16 @@ jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`
   ligne de commande.
 - Machine : adressage écran, attributs, bordure au fil du faisceau, contention, bus flottant,
   mémoire 48K et 128K (pagination, verrou, banques contendues), clavier, beeper, AY (registres,
-  hauteur, enveloppes), cassette (fronts du signal), snapshots des deux modèles, mode sans
-  affichage.
+  hauteur, enveloppes), cassette (fronts du signal, blocs TZX d'arrêt, détection de
+  chargeur), snapshots des deux modèles, mode sans affichage.
+- TZX : les fichiers de test de libspectrum (GPL), dont `complete-tzx.tzx` (un bloc de presque
+  chaque type), comparés front par front aux listes que libspectrum attend ; fichiers
+  corrompus rejetés, boucles et sauts qui finissent.
 - Sur les vraies ROM, en relisant l'écran avec la police de la ROM : démarrage du 48K et du
   menu 128K, `PRINT` tapé au clavier, `BEEP 1,0` (hauteur vérifiée), `PLAY "c"` dans le BASIC
-  128, `LOAD ""` depuis le signal et en mode rapide (48K, et « Tape Loader » du 128K), un
-  programme BASIC qui survit à une sauvegarde puis un chargement dans chaque format.
+  128, `LOAD ""` depuis le signal et en mode rapide (48K, et « Tape Loader » du 128K), depuis
+  un `.TZX` (blocs d'information, bloc d'arrêt, bloc turbo joué en temps réel en mode rapide),
+  un programme BASIC qui survit à une sauvegarde puis un chargement dans chaque format.
 - Timing (Richard Butler) : 72 tests de durée d'instructions et de bus flottant, comparés aux
   mesures sur machine réelle ; ignorés si `local/timing-tests/` est absent.
 
@@ -144,8 +152,20 @@ Son et App :
   dit lui-même le modèle qu'il lui faut (`Snapshot.IsSpectrum128`) ; il est chargé dans une
   machine neuve, qui ne remplace la machine en cours qu'en cas de succès.
 - Cassette réelle : durées de la ROM (pilote 2168 T × 8063 ou 3223, synchronisation 667 + 735,
-  bits 2 × 855 ou 2 × 1710, pause 1 s) ; elle démarre quand la ROM entre dans `LD-BYTES`.
-  Chargement rapide : interception à `0x056B` et saut à `0x05DF` avec H = XOR des octets (FUSE).
+  bits 2 × 855 ou 2 × 1710, pause 1 s pour un `.TAP`). Le signal suit le modèle de libspectrum :
+  chaque événement est une transition (bascule, aucune, bas, haut) puis une durée ; un bloc
+  qui suit une pause commence au niveau bas ; la bande finit par un front, qui termine la
+  dernière impulsion, et ce niveau tient 1 ms avant l'arrêt (sans lui, Speedlock 4 rate le
+  dernier bit d'*Out Run*). Durées TZX et CSW en T-states à 3,5 MHz, jouées telles quelles sur
+  le 128K, comme FUSE ; le bloc « stop si 48K » ne compte que sur le modèle 48K.
+- Démarrage de la cassette : quand la ROM lit le signal (`LD-SAMPLE`, `0x05ED`), ou quand un
+  programme lit le port `0xFE` comme un chargeur (FUSE : 10 lectures à moins de 500 T-states
+  d'intervalle, B augmentant ou diminuant de 1). Elle ne s'arrête d'elle-même qu'aux blocs
+  d'arrêt et à la fin : FUSE l'arrête aussi quand les lectures cessent, mais reconnaît pour cela
+  les boucles de nombreux chargeurs, que nous n'avons pas.
+- Chargement rapide : interception à `0x056B` et saut à `0x05DF` avec H = XOR des octets (FUSE),
+  pour les blocs à la vitesse de la ROM (bloc TZX `0x10`, ou `0x11` aux durées de bits de la
+  ROM), en passant les blocs sans son. Tout autre bloc est joué en temps réel.
   Turbo : frames sans image ni son pendant 12 ms, puis une frame dessinée.
 - Performances : environ 24 fois la vitesse réelle en jeu avec image et son, 46 fois sans.
 
@@ -158,9 +178,13 @@ Son et App :
 - Caractères du mode étendu (`[ ] { } ~ | \ ©`) non traduits au clavier.
 - Tests visuels de l'ULA (`btime`, `stime`, `ulatest3`) : licence et références à trouver.
 - Pas encore de fenêtre « À propos » (copyright Amstrad : `README.md` et `roms/README.md`).
+- TZX : pas d'accélération des chargeurs (FUSE raccourcit les boucles des chargeurs qu'il
+  reconnaît ; ici, seul le turbo accélère) ; bloc « select » (`0x28`) ignoré ; les blocs CSW et
+  « generalized data » sont décodés en mémoire à l'ouverture. Formats `.PZX` et `.CSW` seuls
+  non pris en charge ; pas d'écriture de cassette (`SAVE`).
 
-**Prochaine étape** : le **jalon 10**, format de cassette `.TZX` (chargeurs protégés et turbo),
-qui s'appuiera sur le signal de cassette du jalon 6.
+**Prochaine étape** : le plan du §7 est terminé ; la suite reste à choisir, par exemple parmi
+les points ci-dessus.
 
 ---
 
@@ -190,7 +214,7 @@ iSpectrum/
 ├── src/
 │   ├── iSpectrum.Z80/        # CPU Z80 pur (IMemory, IIo), désassembleur
 │   ├── iSpectrum.Core/       # Machines 48K et 128K : mémoire, ULA, clavier, son, AY, frame
-│   │   ├── Tape/             # .TAP et lecteur de cassette
+│   │   ├── Tape/             # .TAP, .TZX et lecteur de cassette
 │   │   ├── Snapshots/        # .SNA et .Z80
 │   │   └── Debugging/        # Débogueur, symboles, ligne de commande
 │   └── iSpectrum.App/        # Front-end Raylib-cs : fenêtre, menus, clavier, son, débogueur
@@ -201,6 +225,7 @@ iSpectrum/
 │   └── iSpectrum.Core.Tests/
 │       ├── Z80Test/          # z80test de Patrik Rak, MIT (provenance dans README.md)
 │       ├── ThirdParty/       # Tests de timing de Richard Butler (fichiers dans local/)
+│       ├── Tape/Libspectrum/ # Fichiers TZX de libspectrum, GPL (provenance dans README.md)
 │       ├── Debugging/, Snapshots/, Tape/
 │       └── *.cs              # Écran, ULA, contention, mémoire, clavier, son, AY, ROM…
 ├── examples/
@@ -355,7 +380,7 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 1. **`.SNA`** — snapshot brut (registres + RAM). Le plus simple, idéal pour tester des jeux vite.
 2. **`.Z80`** — snapshot compressé (versions 1, 2 et 3), le format le plus répandu.
 3. **`.TAP`** — signal de cassette reconstitué et lu par la ROM (temps réel, avec son et bandes), ou interception de la routine ROM `LD-BYTES` (`0x0556`) et injection directe des blocs (« flash loading »).
-4. **`.TZX`** — émulation réelle du signal cassette, nécessaire pour les chargeurs protégés/turbo.
+4. **`.TZX`** — émulation réelle du signal cassette, nécessaire pour les chargeurs protégés/turbo ; les blocs à la vitesse de la ROM restent interceptables.
 
 ---
 
@@ -390,7 +415,7 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 | 7 | Contention mémoire + rendu ligne par ligne | Démos et effets de bordure corrects — **terminé** (`jalon-7`), validation fine par des suites de test à venir |
 | 8 | Modèle 128K | Pagination (port `0x7FFD`) + puce son AY-3-8912 — **terminé** (`jalon-8`) |
 | 9 | Débogueur intégré | Désassembleur, points d'arrêt, vue mémoire/registres — **terminé** (`jalon-9`), avec symboles et rechargement |
-| 10 | `.TZX` | Chargeurs protégés / turbo (le signal de cassette existe depuis le jalon 6) |
+| 10 | `.TZX` | Chargeurs protégés / turbo — **terminé** (`jalon-10`) : Speedlock 1, 2, 4, 7 et Alkatraz chargent |
 
 ---
 
