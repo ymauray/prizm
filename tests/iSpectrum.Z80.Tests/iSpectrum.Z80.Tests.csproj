@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <None Include="Fuse\tests.in;Fuse\tests.expected" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Fuse\tests.in;Fuse\tests.expected;Zex\*.com" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
