@@ -29,6 +29,15 @@ public abstract class Spectrum
     /// <summary>The end of LD-BYTES: LD A,H / CP 1 / RET. H = 0 (checksum right) sets carry: success.</summary>
     private const ushort LdBytesExit = 0x05DF;
 
+    /// <summary>
+    /// SA-FLAG, inside SA-BYTES: the flag byte in A, the start in IX and the length in DE, and
+    /// SA/LD-RET already pushed as the return address. The same in ROM 1 of the 128K.
+    /// </summary>
+    private const ushort SaBytesReady = 0x04D0;
+
+    /// <summary>The RET that ends SA-BYTES, into SA/LD-RET: border restored, BREAK checked, EI.</summary>
+    private const ushort SaBytesExit = 0x053E;
+
     /// <summary>Whether the interrupt of the current frame has been taken.</summary>
     private bool _interruptTaken;
 
@@ -100,6 +109,12 @@ public abstract class Spectrum
     /// </summary>
     public bool FastLoad { get; set; }
 
+    /// <summary>
+    /// The blocks saved by the ROM (SAVE, or a program calling SA-BYTES). Saving is always
+    /// instant: the ROM's routine is skipped, and the block goes whole into the recorder.
+    /// </summary>
+    public TapeRecorder Recorder { get; } = new();
+
     /// <summary>The picture of the last completed frame (see <see cref="Ula.FrameBuffer"/>).</summary>
     public ReadOnlySpan<uint> FrameBuffer => Ula.FrameBuffer;
 
@@ -146,7 +161,11 @@ public abstract class Spectrum
 
         if (IsTapeRomPaged)
         {
-            if (FastLoad)
+            if (Cpu.PC == SaBytesReady)
+            {
+                SaveBlockAtOnce();
+            }
+            else if (FastLoad)
             {
                 if (Cpu.PC == LdBytesReady && !Tape.IsPlaying)
                 {
@@ -201,6 +220,22 @@ public abstract class Spectrum
         var load = (Cpu.F_ & 0x01) != 0;
         Cpu.H = block.Length > 0 && block[0] == Cpu.A_ ? CopyBlock(block, load) : (byte)0xFF;
         Cpu.PC = LdBytesExit;
+    }
+
+    /// <summary>
+    /// Does the work of SA-BYTES: records the flag in A, then DE bytes from IX, and the checksum;
+    /// then jumps to the RET that ends the routine, as FUSE's save trap does.
+    /// </summary>
+    private void SaveBlockAtOnce()
+    {
+        var data = new byte[(Cpu.D << 8) | Cpu.E];
+        for (var i = 0; i < data.Length; i++)
+        {
+            data[i] = Memory.Read((ushort)(Cpu.IX + i));
+        }
+
+        Recorder.Record(TapFile.MakeBlock(Cpu.A, data));
+        Cpu.PC = SaBytesExit;
     }
 
     /// <summary>

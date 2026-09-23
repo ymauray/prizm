@@ -42,6 +42,19 @@ public sealed class TapFile
         return new TapFile(blocks);
     }
 
+    /// <summary>Writes one block as a .TAP file stores it: its length, then its bytes. Appending blocks makes a tape.</summary>
+    public static void WriteBlock(Stream stream, ReadOnlySpan<byte> block)
+    {
+        if (block.Length > ushort.MaxValue)
+        {
+            throw new ArgumentException("A .TAP block holds at most 65535 bytes.", nameof(block));
+        }
+
+        stream.WriteByte((byte)block.Length);
+        stream.WriteByte((byte)(block.Length >> 8));
+        stream.Write(block);
+    }
+
     /// <summary>Builds a block from its flag and data, adding the checksum (used by tests and tools).</summary>
     public static byte[] MakeBlock(byte flag, ReadOnlySpan<byte> data)
     {
