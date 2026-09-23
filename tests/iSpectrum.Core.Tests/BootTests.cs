@@ -34,6 +34,34 @@ public class BootTests
         Assert.StartsWith("0 OK, 0:1", ScreenText.ReadRow(spectrum.Memory.Contents, 23));
     }
 
+    [Fact]
+    public void Rom_PrintsSymbolsTypedAsCharacters()
+    {
+        var spectrum = Boot();
+
+        // "p" at the start of a line is PRINT; the quotes, + and = go through Symbol Shift.
+        TypeText(spectrum, "p\"A+B=C\"");
+        Type(spectrum, SpectrumKey.Enter);
+
+        Assert.StartsWith("A+B=C ", ScreenText.ReadRow(spectrum.Memory.Contents, 0));
+    }
+
+    private static void TypeText(Spectrum48 spectrum, string text)
+    {
+        foreach (var c in text)
+        {
+            Assert.True(SpectrumCharacters.TryGetKeys(c, out var key, out var shift), $"Cannot type '{c}'");
+            if (shift is { } shiftKey)
+            {
+                Type(spectrum, shiftKey, key);
+            }
+            else
+            {
+                Type(spectrum, key);
+            }
+        }
+    }
+
     private static Spectrum48 Boot()
     {
         var spectrum = new Spectrum48(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "roms", "48.rom")));
