@@ -55,7 +55,7 @@ public sealed class Ula : IIo, IScreenWriteObserver
 
     private readonly SpectrumTimings _timings;
     private Z80Cpu? _cpu;
-    private Memory48K? _memory;
+    private SpectrumMemory? _memory;
 
     /// <summary>A 48K ULA.</summary>
     public Ula()
@@ -132,7 +132,7 @@ public sealed class Ula : IIo, IScreenWriteObserver
     /// Gives the ULA the CPU whose T-state count stamps border and speaker changes, and the
     /// memory it reads the screen from.
     /// </summary>
-    public void Connect(Z80Cpu cpu, Memory48K memory)
+    public void Connect(Z80Cpu cpu, SpectrumMemory memory)
     {
         _cpu = cpu;
         _memory = memory;
@@ -165,12 +165,13 @@ public sealed class Ula : IIo, IScreenWriteObserver
         }
 
         var x = (position / 8) * 16;
+        var screen = _memory.Screen;
         return (position % 8) switch
         {
-            3 => _memory.Read(ScreenLayout.PixelAddress(x, y)),
-            4 => _memory.Read(ScreenLayout.AttributeAddress(x, y)),
-            5 => _memory.Read(ScreenLayout.PixelAddress(x + 8, y)),
-            6 => _memory.Read(ScreenLayout.AttributeAddress(x + 8, y)),
+            3 => screen[ScreenLayout.PixelAddress(x, y) - ScreenLayout.BitmapAddress],
+            4 => screen[ScreenLayout.AttributeAddress(x, y) - ScreenLayout.BitmapAddress],
+            5 => screen[ScreenLayout.PixelAddress(x + 8, y) - ScreenLayout.BitmapAddress],
+            6 => screen[ScreenLayout.AttributeAddress(x + 8, y) - ScreenLayout.BitmapAddress],
             _ => 0xFF,
         };
     }
@@ -183,11 +184,11 @@ public sealed class Ula : IIo, IScreenWriteObserver
     /// drawn at the very T-state of the write shows the new value: the real ULA reads its bytes a
     /// little before it displays them.
     /// </summary>
-    void IScreenWriteObserver.BeforeScreenWrite(ReadOnlySpan<byte> memory)
+    void IScreenWriteObserver.BeforeScreenWrite(ReadOnlySpan<byte> screen)
     {
         if (!Headless)
         {
-            RenderUpTo((_cpu?.TStates ?? 0) - 1, memory);
+            RenderUpTo((_cpu?.TStates ?? 0) - 1, screen);
         }
     }
 
@@ -238,11 +239,12 @@ public sealed class Ula : IIo, IScreenWriteObserver
     }
 
     /// <summary>Finishes drawing the frame, then starts the next one: FLASH counter, border changes.</summary>
-    public void EndFrame(ReadOnlySpan<byte> memory)
+    /// <param name="screen">The displayed bank, as <see cref="SpectrumMemory.Screen"/>.</param>
+    public void EndFrame(ReadOnlySpan<byte> screen)
     {
         if (!Headless)
         {
-            RenderUpTo(long.MaxValue, memory);
+            RenderUpTo(long.MaxValue, screen);
         }
 
         _frameCount++;
@@ -259,7 +261,7 @@ public sealed class Ula : IIo, IScreenWriteObserver
     /// Draws, in beam order, every pixel the beam reaches at or before <paramref name="time"/>:
     /// border pixels one by one, screen pixels by groups of 8 (4 T-states).
     /// </summary>
-    private void RenderUpTo(long time, ReadOnlySpan<byte> memory)
+    private void RenderUpTo(long time, ReadOnlySpan<byte> screen)
     {
         for (; _row < FrameHeight; _row++, _column = 0)
         {
@@ -279,7 +281,7 @@ public sealed class Ula : IIo, IScreenWriteObserver
                 var x = _column - BorderLeft;
                 if (screenLine && x is >= 0 and < ScreenLayout.Width)
                 {
-                    DrawCell(line.Slice(_column, 8), x, y, memory);
+                    DrawCell(line.Slice(_column, 8), x, y, screen);
                     _column += 8;
                 }
                 else
@@ -297,10 +299,10 @@ public sealed class Ula : IIo, IScreenWriteObserver
         }
     }
 
-    private void DrawCell(Span<uint> cell, int x, int y, ReadOnlySpan<byte> memory)
+    private void DrawCell(Span<uint> cell, int x, int y, ReadOnlySpan<byte> screen)
     {
-        var pixels = memory[ScreenLayout.PixelAddress(x, y)];
-        var attribute = memory[ScreenLayout.AttributeAddress(x, y)];
+        var pixels = screen[ScreenLayout.PixelAddress(x, y) - ScreenLayout.BitmapAddress];
+        var attribute = screen[ScreenLayout.AttributeAddress(x, y) - ScreenLayout.BitmapAddress];
         var bright = (attribute & 0x40) != 0;
         var ink = Palette.Colors[Palette.Index(attribute & 0x07, bright)];
         var paper = Palette.Colors[Palette.Index((attribute >> 3) & 0x07, bright)];

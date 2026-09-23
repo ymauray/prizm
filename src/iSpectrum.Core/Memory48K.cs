@@ -9,16 +9,13 @@ namespace iSpectrum.Core;
 /// 48K memory map: 16 KB of ROM at 0x0000-0x3FFF (writes ignored), 48 KB of RAM above, of which
 /// 0x4000-0x7FFF is shared with the ULA and contended (see <see cref="SpectrumTimings"/>).
 /// </summary>
-public sealed class Memory48K : IMemory
+public sealed class Memory48K : SpectrumMemory
 {
     public const int RomSize = 0x4000;
 
-    private const ushort ScreenEnd = 0x5B00;
+    private const ushort ScreenEnd = 0x4000 + ScreenSize;
 
     private readonly byte[] _memory = new byte[0x10000];
-
-    /// <summary>Told before each write to the screen memory, so the picture can catch up first.</summary>
-    internal IScreenWriteObserver? ScreenObserver { get; set; }
 
     public Memory48K(ReadOnlySpan<byte> rom)
     {
@@ -44,9 +41,12 @@ public sealed class Memory48K : IMemory
         data.CopyTo(_memory.AsSpan(address));
     }
 
-    public byte Read(ushort address) => _memory[address];
+    /// <summary>The 48K always displays the RAM at 0x4000.</summary>
+    public override ReadOnlySpan<byte> Screen => _memory.AsSpan(0x4000, BankSize);
 
-    public void Write(ushort address, byte value)
+    public override byte Read(ushort address) => _memory[address];
+
+    public override void Write(ushort address, byte value)
     {
         if (address < RomSize)
         {
@@ -55,15 +55,15 @@ public sealed class Memory48K : IMemory
 
         if (address < ScreenEnd)
         {
-            ScreenObserver?.BeforeScreenWrite(_memory);
+            BeforeScreenChange();
         }
 
         _memory[address] = value;
     }
 
-    public int ContentionDelay(ushort address, long tStates) =>
+    public override int ContentionDelay(ushort address, long tStates) =>
         IsContended(address) ? SpectrumTimings.Spectrum48.ContentionDelay(tStates) : 0;
 
     /// <summary>The lower 16 KB of RAM, shared with the ULA.</summary>
-    public bool IsContended(ushort address) => (address & 0xC000) == 0x4000;
+    public override bool IsContended(ushort address) => (address & 0xC000) == 0x4000;
 }
