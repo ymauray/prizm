@@ -1,0 +1,64 @@
+name: Rapport de bug
+description: Signaler un dysfonctionnement, un problème de timing ou une régression dans Prizm
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci de prendre le temps de signaler ce problème. Assurez-vous d'avoir vérifié qu'un rapport similaire n'est pas déjà ouvert.
+  - type: input
+    id: version
+    attributes:
+      label: Version de Prizm
+      description: Commit Git ou version utilisée (ex. `main` à `5d7d83e`, ou `jalon-11`).
+      placeholder: ex. main (5d7d83e)
+    validations:
+      required: true
+  - type: dropdown
+    id: machine
+    attributes:
+      label: Modèle Spectrum concerné
+      options:
+        - ZX Spectrum 48K
+        - ZX Spectrum 128K
+        - Les deux / Indifférent
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Système d'exploitation et architecture
+      description: ex. macOS 15.3 Apple Silicon (M1/M2/M3), Ubuntu 24.04 x64, Windows 11...
+      placeholder: ex. macOS Sonoma 14.5 (Apple Silicon)
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Description du problème
+      description: Description claire et concise du problème rencontré.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Étapes de reproduction
+      description: Étapes précises pour reproduire le comportement.
+      placeholder: |
+        1. Lancer Prizm via 'dotnet run --project src/Prizm.App'
+        2. Ouvrir le fichier '...'
+        3. Observer l'erreur...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Comportement attendu
+      description: Que devrait-il se passer normalement ? (ex. référence par rapport à un vrai Spectrum ou à FUSE)
+    validations:
+      required: true
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Informations complémentaires / Logs
+      description: Captures d'écran, logs console ou toute information utile (attention : ne pas joindre de ROM ou jeux commerciaux protégés).

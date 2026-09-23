@@ -1,12 +1,17 @@
 # Prizm
 
+[![CI](https://github.com/ymauray/prizm/actions/workflows/ci.yml/badge.svg)](https://github.com/ymauray/prizm/actions/workflows/ci.yml)
+[![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
+[![.NET 10](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/)
+
 Émulateur ZX Spectrum **48K** et **128K** écrit en C# (.NET 10), pensé d'abord pour macOS sur
 Apple Silicon. Il démarre les ROM d'origine, on y tape du BASIC au clavier du Mac, le beeper et
 la puce son AY du 128K se font entendre, et il charge snapshots (`.SNA`, `.Z80`) et cassettes
 (`.TAP`, `.TZX`), en temps réel ou instantanément, y compris les chargeurs turbo et protégés.
 
 L'architecture, l'état d'avancement et le plan par jalons sont dans [`OVERVIEW.md`](OVERVIEW.md) ;
-les règles de contribution (y compris pour les agents de code) dans [`AGENTS.md`](AGENTS.md).
+les règles de contribution dans [`CONTRIBUTING.md`](CONTRIBUTING.md) et [`AGENTS.md`](AGENTS.md) ;
+le code de conduite dans [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
 
 ## Lancer
 
@@ -160,6 +165,14 @@ mkdir -p local/timing-tests/screens
 # Déposez timing_tests_48k_v1.0.z80 dans local/timing-tests/
 # Déposez 35-contended.scr, 35-uncontended.scr, 36-contended.scr, 37-contended.scr dans local/timing-tests/screens/
 ```
+
+### Intégration continue (CI/CD)
+
+Le projet utilise GitHub Actions pour valider et livrer chaque modification :
+- **Multiplateforme** : compilation et exécution des tests sous macOS (`macos-latest`, Apple Silicon) et Linux (`ubuntu-latest`).
+- **Tests unitaires rapides** (`Category!=Slow`) exécutés à chaque pull request et push.
+- **Tests de conformité Z80 complets** (ZEXDOC et ZEXALL) exécutés sur macOS lors de chaque push sur la branche `main`.
+- **Publication automatisée** : la création d'un tag Git `v*` déclenche la génération et la publication automatique des binaires pour macOS Apple Silicon et Linux via GitHub Releases.
 
 ## ROM et fichiers tiers
 

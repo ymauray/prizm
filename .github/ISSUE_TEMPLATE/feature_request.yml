@@ -1,0 +1,32 @@
+name: Demande d'amélioration ou fonctionnalité
+description: Proposer une nouvelle idée ou une amélioration pour Prizm
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Merci pour votre intérêt ! Utilisez ce formulaire pour proposer une fonctionnalité ou une amélioration technique.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problème ou besoin constaté
+      description: À quel besoin ou limitation cette proposition répond-elle ?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Solution proposée
+      description: Description claire de ce que vous aimeriez voir implémenté dans Prizm.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives envisagées
+      description: Avez-vous pensé à d'autres solutions ou contournements ?
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Contexte additionnel
+      description: Liens, spécifications matérielles ou documents de référence (ex. Sinclair Wiki, documentation Z80).

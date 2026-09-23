@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Discussions GitHub (Questions & Échanges)
+    url: https://github.com/ymauray/prizm/discussions
+    about: Pour poser une question générale, demander de l'aide ou suggérer une idée, utilisez les discussions.
