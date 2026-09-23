@@ -1,0 +1,11 @@
+bin/
+obj/
+*.user
+.vs/
+.idea/
+.vscode/
+.DS_Store
+TestResults/
+
+# Personal test files (games, snapshots): never committed
+local/
