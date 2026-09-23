@@ -1,8 +1,8 @@
 # iSpectrum
 
 Émulateur ZX Spectrum 48K écrit en C# (.NET 10), pensé d'abord pour macOS sur Apple Silicon.
-Il démarre la ROM d'origine, on y tape du BASIC au clavier du Mac, et il charge les snapshots
-`.SNA` et `.Z80` ; le son et les cassettes viendront ensuite.
+Il démarre la ROM d'origine, on y tape du BASIC au clavier du Mac, il charge les snapshots
+`.SNA` et `.Z80`, et le beeper se fait entendre ; les cassettes viendront ensuite.
 
 L'architecture, l'état d'avancement et le plan par jalons sont dans [`OVERVIEW.md`](OVERVIEW.md) ;
 les règles de contribution (y compris pour les agents de code) dans [`AGENTS.md`](AGENTS.md).
