@@ -40,17 +40,19 @@ Lire aussi **`OVERVIEW.md`** : architecture, détails techniques de la machine e
 - Toute modification du Z80 doit garder au vert :
   - la suite **FUSE** (`tests.in` / `tests.expected`) ;
   - **ZEXDOC** (et idéalement **ZEXALL**) via le harnais CP/M.
-- Les tests lents (ZEXALL) peuvent être marqués d'une catégorie pour être exclus du run rapide.
+- ZEXDOC et ZEXALL sont marqués `Category=Slow` : chacun exécute environ 47 milliards de T-states
+  (40 s en Release, 4 min en Debug). Run rapide : `dotnet test --filter "Category!=Slow"`.
 - Ajouter des tests unitaires pour : adressage écran, décodage des attributs, matrice clavier,
   chargeurs `.SNA` / `.Z80` / `.TAP`.
-- Commande de référence : `dotnet test` à la racine.
+- Commande de référence : `dotnet test -c Release` à la racine. Si un test échoue, le relancer
+  en Debug (`dotnet test --filter ...`) pour le déboguer.
 
 ## Façon de travailler
 
 - Avancer **jalon par jalon** (voir `OVERVIEW.md` §7) ; ne pas commencer un jalon avant que
   le précédent soit fonctionnel et testé.
 - Petits commits cohérents, un sujet par commit, message clair.
-- Avant de terminer une tâche : `dotnet build` sans avertissement et `dotnet test` au vert.
+- Avant de terminer une tâche : `dotnet build` sans avertissement et `dotnet test -c Release` au vert.
 - En cas de doute sur un comportement matériel, se référer à FUSE, au Sinclair Wiki et à
   *The Undocumented Z80 Documented* ; documenter le choix dans un commentaire.
 - Mettre à jour `OVERVIEW.md` si l'architecture ou le plan changent.

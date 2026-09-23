@@ -25,4 +25,4 @@ Chaque programme exécute environ 47 milliards de T-states : 40 s en Release, 4 
 Les deux tests portent la catégorie `Slow` :
 
 - run rapide : `dotnet test --filter "Category!=Slow"` ;
-- run complet, en Release pour aller plus vite : `dotnet test -c Release`.
+- run complet (commande de référence) : `dotnet test -c Release` ; en cas d'échec, relancer le test en Debug pour le déboguer.
