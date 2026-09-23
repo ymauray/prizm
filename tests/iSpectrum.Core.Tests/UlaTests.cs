@@ -22,7 +22,7 @@ public class UlaTests
         _memory[ScreenLayout.PixelAddress(0, 0)] = 0b1000_0000;
         _memory[ScreenLayout.AttributeAddress(0, 0)] = (6 << 3) | 1;
 
-        _ula.EndFrame(_memory);
+        _ula.EndFrame(_memory.AsSpan(0x4000));
 
         Assert.Equal(Color(1), Pixel(0, 0));
         Assert.Equal(Color(6), Pixel(1, 0));
@@ -34,7 +34,7 @@ public class UlaTests
         _memory[ScreenLayout.PixelAddress(8, 8)] = 0xFF;
         _memory[ScreenLayout.AttributeAddress(8, 8)] = 0x40 | 2; // bright, red ink
 
-        _ula.EndFrame(_memory);
+        _ula.EndFrame(_memory.AsSpan(0x4000));
 
         Assert.Equal(Color(2, bright: true), Pixel(8, 8));
         Assert.NotEqual(Color(2), Pixel(8, 8));
@@ -48,17 +48,17 @@ public class UlaTests
 
         for (var frame = 0; frame < 16; frame++)
         {
-            _ula.EndFrame(_memory);
+            _ula.EndFrame(_memory.AsSpan(0x4000));
             Assert.Equal(Color(0), Pixel(0, 0));
         }
 
         for (var frame = 16; frame < 32; frame++)
         {
-            _ula.EndFrame(_memory);
+            _ula.EndFrame(_memory.AsSpan(0x4000));
             Assert.Equal(Color(7), Pixel(0, 0));
         }
 
-        _ula.EndFrame(_memory);
+        _ula.EndFrame(_memory.AsSpan(0x4000));
         Assert.Equal(Color(0), Pixel(0, 0));
     }
 
@@ -71,9 +71,9 @@ public class UlaTests
 
         // Blue until the beam reaches the left border of screen line 100 (32 pixels, 16 T-states
         // before its first screen pixel), then red.
-        cpu.TStates = Ula.FirstPixelTState + (100 * Ula.LineTStates) - 16;
+        cpu.TStates = SpectrumTimings.Spectrum48.FirstPixelTState + (100 * SpectrumTimings.Spectrum48.LineTStates) - 16;
         _ula.Out(0x00FE, 0x02);
-        _ula.EndFrame(_memory);
+        _ula.EndFrame(_memory.AsSpan(0x4000));
 
         var row = (100 + Ula.BorderTop) * Ula.FrameWidth;
         Assert.Equal(Color(1), _ula.FrameBuffer[row - 1]);           // right border of line 99
@@ -93,9 +93,9 @@ public class UlaTests
             spectrum.Memory.Write((ushort)address, 7 << 3);
         }
 
-        spectrum.Cpu.TStates = Ula.FirstPixelTState + (100 * Ula.LineTStates);
+        spectrum.Cpu.TStates = SpectrumTimings.Spectrum48.FirstPixelTState + (100 * SpectrumTimings.Spectrum48.LineTStates);
         spectrum.Memory.Write(ScreenLayout.AttributeAddress(0, 96), 2 << 3);
-        spectrum.Ula.EndFrame(spectrum.Memory.Contents);
+        spectrum.Ula.EndFrame(spectrum.Memory.Screen);
 
         uint ScreenPixel(int y) => spectrum.FrameBuffer[((y + Ula.BorderTop) * Ula.FrameWidth) + Ula.BorderLeft];
         Assert.Equal(Color(7), ScreenPixel(99));
@@ -107,8 +107,8 @@ public class UlaTests
     public void BorderChanges_StartOverAtTheNextFrame()
     {
         _ula.Out(0x00FE, 0x04);
-        _ula.EndFrame(_memory);
-        _ula.EndFrame(_memory);
+        _ula.EndFrame(_memory.AsSpan(0x4000));
+        _ula.EndFrame(_memory.AsSpan(0x4000));
 
         Assert.Equal(Color(4), _ula.FrameBuffer[0]);
     }
@@ -119,7 +119,7 @@ public class UlaTests
         _ula.Out(0x00FE, 0xF3); // only bits 0-2 count: 3 = magenta
         _ula.Out(0x00FF, 0x01); // odd port: not the ULA
 
-        _ula.EndFrame(_memory);
+        _ula.EndFrame(_memory.AsSpan(0x4000));
 
         Assert.Equal(3, _ula.Border);
         Assert.Equal(Color(3), _ula.FrameBuffer[0]);

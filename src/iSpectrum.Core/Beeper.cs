@@ -14,10 +14,6 @@ public sealed class Beeper
 {
     public const int SampleRate = 44100;
 
-    /// <summary>The Z80 clock of the 48K, in T-states per second.</summary>
-    private const double ClockRate = 3_500_000;
-
-    private const double TStatesPerSample = ClockRate / SampleRate;
 
     /// <summary>A little over one frame's worth (about 881 samples at 50.08 frames per second).</summary>
     private const int MaxSamplesPerFrame = 1024;
@@ -27,6 +23,9 @@ public sealed class Beeper
     /// <summary>Loudness of the tape signal relative to the speaker.</summary>
     private const double TapeVolume = 0.5;
 
+    /// <summary>Loudness of a sound chip at full output (all its channels at full volume).</summary>
+    private const double ChipVolume = 1.0;
+
     /// <summary>High-pass coefficient: a time constant of about 200 samples (4.5 ms).</summary>
     private const double DcBlocking = 0.995;
 
@@ -35,12 +34,23 @@ public sealed class Beeper
 
     private bool _speaker;
     private bool _tape;
+    private double _chip;
 
     /// <summary>T-state (from the start of the frame) up to which the level has been integrated.</summary>
     private double _time;
 
     /// <summary>T-state at which the sample being built ends.</summary>
-    private double _sampleEnd = TStatesPerSample;
+    private double _sampleEnd;
+
+    /// <summary>T-states per output sample: about 79 on the 48K.</summary>
+    private readonly double _tStatesPerSample;
+
+    /// <summary>A beeper for a machine whose Z80 runs at <paramref name="clockRate"/> T-states per second.</summary>
+    public Beeper(int clockRate = 3_500_000)
+    {
+        _tStatesPerSample = (double)clockRate / SampleRate;
+        _sampleEnd = _tStatesPerSample;
+    }
 
     /// <summary>Level integrated over time within the sample being built.</summary>
     private double _area;
@@ -74,7 +84,14 @@ public sealed class Beeper
         _tape = high;
     }
 
-    private double Level => (_speaker ? 1 : 0) + (_tape ? TapeVolume : 0);
+    /// <summary>Records the output of a sound chip (the 128K's AY), 0 to 1, at <paramref name="tStates"/>.</summary>
+    public void SetChipLevel(long tStates, double level)
+    {
+        Advance(tStates);
+        _chip = level;
+    }
+
+    private double Level => (_speaker ? 1 : 0) + (_tape ? TapeVolume : 0) + (_chip * ChipVolume);
 
     /// <summary>
     /// Produces the samples up to the end of the frame, then makes the times relative to the next
@@ -99,7 +116,7 @@ public sealed class Beeper
             // Skip whole samples: only keep the sample boundaries where they would be.
             if (time >= _sampleEnd)
             {
-                _sampleEnd += (Math.Floor((time - _sampleEnd) / TStatesPerSample) + 1) * TStatesPerSample;
+                _sampleEnd += (Math.Floor((time - _sampleEnd) / _tStatesPerSample) + 1) * _tStatesPerSample;
                 _area = 0;
             }
 
@@ -110,10 +127,10 @@ public sealed class Beeper
         while (time >= _sampleEnd)
         {
             _area += Level * (_sampleEnd - _time);
-            Emit(_area / TStatesPerSample);
+            Emit(_area / _tStatesPerSample);
             _area = 0;
             _time = _sampleEnd;
-            _sampleEnd += TStatesPerSample;
+            _sampleEnd += _tStatesPerSample;
         }
 
         _area += Level * (time - _time);

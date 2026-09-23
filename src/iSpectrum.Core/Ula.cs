@@ -24,11 +24,6 @@ public sealed class Ula : IIo, IScreenWriteObserver
     public const int FrameWidth = ScreenLayout.Width + (2 * BorderLeft);
     public const int FrameHeight = ScreenLayout.Height + (2 * BorderTop);
 
-    /// <summary>T-state at which the beam draws the first pixel of the screen area (48K).</summary>
-    public const int FirstPixelTState = 14336;
-
-    /// <summary>T-states per scan line; the beam draws 2 pixels per T-state.</summary>
-    public const int LineTStates = 224;
 
     /// <summary>T-states between the CPU's call to In and the moment the Z80 latches the data.</summary>
     private const int IoDataLatchDelay = 3;
@@ -58,17 +53,34 @@ public sealed class Ula : IIo, IScreenWriteObserver
     private uint _borderColor = Palette.Colors[0];
     private bool _flashInverted;
 
+    private readonly SpectrumTimings _timings;
     private Z80Cpu? _cpu;
-    private Memory48K? _memory;
+    private SpectrumMemory? _memory;
+
+    /// <summary>A 48K ULA.</summary>
+    public Ula()
+        : this(SpectrumTimings.Spectrum48)
+    {
+    }
+
+    public Ula(SpectrumTimings timings)
+    {
+        _timings = timings;
+        Beeper = new Beeper(timings.ClockRate);
+        _soundSources = [Tape];
+    }
 
     /// <summary>The key matrix read through port 0xFE.</summary>
     public Keyboard Keyboard { get; } = new();
 
     /// <summary>The speaker, driven by bit 4 of port 0xFE, which also plays the tape signal.</summary>
-    public Beeper Beeper { get; } = new();
+    public Beeper Beeper { get; }
 
     /// <summary>The tape deck, whose signal is read on bit 6 of port 0xFE (EAR).</summary>
     public TapePlayer Tape { get; } = new();
+
+    /// <summary>What changes the sound besides the speaker: the tape, and the AY on the 128K.</summary>
+    private ISoundSource[] _soundSources = [];
 
     /// <summary>
     /// Border colour, 0-7, as last written to port 0xFE. Setting it directly (snapshot loading)
@@ -115,7 +127,7 @@ public sealed class Ula : IIo, IScreenWriteObserver
             return FloatingBus((_cpu?.TStates ?? 0) + IoDataLatchDelay);
         }
 
-        Tape.AdvanceTo(_cpu?.TStates ?? 0, Beeper);
+        AdvanceSounds(_cpu?.TStates ?? 0);
         var ear = (Tape.IsPlaying ? Tape.Level : _speakerHigh) ? 0x40 : 0;
         return (byte)(0xA0 | ear | Keyboard.Read((byte)(port >> 8)));
     }
@@ -124,7 +136,7 @@ public sealed class Ula : IIo, IScreenWriteObserver
     /// Gives the ULA the CPU whose T-state count stamps border and speaker changes, and the
     /// memory it reads the screen from.
     /// </summary>
-    public void Connect(Z80Cpu cpu, Memory48K memory)
+    public void Connect(Z80Cpu cpu, SpectrumMemory memory)
     {
         _cpu = cpu;
         _memory = memory;
@@ -143,43 +155,44 @@ public sealed class Ula : IIo, IScreenWriteObserver
     /// </remarks>
     public byte FloatingBus(long tStates)
     {
-        var sinceScreen = tStates - FirstPixelTState;
+        var sinceScreen = tStates - _timings.FirstPixelTState;
         if (_memory is null || sinceScreen < 0)
         {
             return 0xFF;
         }
 
-        var y = (int)(sinceScreen / LineTStates);
-        var position = (int)(sinceScreen % LineTStates);
+        var y = (int)(sinceScreen / _timings.LineTStates);
+        var position = (int)(sinceScreen % _timings.LineTStates);
         if (y >= ScreenLayout.Height || position >= 128)
         {
             return 0xFF;
         }
 
         var x = (position / 8) * 16;
+        var screen = _memory.Screen;
         return (position % 8) switch
         {
-            3 => _memory.Read(ScreenLayout.PixelAddress(x, y)),
-            4 => _memory.Read(ScreenLayout.AttributeAddress(x, y)),
-            5 => _memory.Read(ScreenLayout.PixelAddress(x + 8, y)),
-            6 => _memory.Read(ScreenLayout.AttributeAddress(x + 8, y)),
+            3 => screen[ScreenLayout.PixelAddress(x, y) - ScreenLayout.BitmapAddress],
+            4 => screen[ScreenLayout.AttributeAddress(x, y) - ScreenLayout.BitmapAddress],
+            5 => screen[ScreenLayout.PixelAddress(x + 8, y) - ScreenLayout.BitmapAddress],
+            6 => screen[ScreenLayout.AttributeAddress(x + 8, y) - ScreenLayout.BitmapAddress],
             _ => 0xFF,
         };
     }
 
-    /// <summary>Contended I/O points wait like contended memory (see <see cref="Contention48K"/>).</summary>
-    public int ContentionDelay(ushort port, long tStates) => Contention48K.Delay(tStates);
+    /// <summary>Contended I/O points wait like contended memory (see <see cref="SpectrumTimings"/>).</summary>
+    public int ContentionDelay(ushort port, long tStates) => _timings.ContentionDelay(tStates);
 
     /// <summary>
     /// Draws what the beam has shown so far, before the CPU changes the screen memory. A pixel
     /// drawn at the very T-state of the write shows the new value: the real ULA reads its bytes a
     /// little before it displays them.
     /// </summary>
-    void IScreenWriteObserver.BeforeScreenWrite(ReadOnlySpan<byte> memory)
+    void IScreenWriteObserver.BeforeScreenWrite(ReadOnlySpan<byte> screen)
     {
         if (!Headless)
         {
-            RenderUpTo((_cpu?.TStates ?? 0) - 1, memory);
+            RenderUpTo((_cpu?.TStates ?? 0) - 1, screen);
         }
     }
 
@@ -197,8 +210,8 @@ public sealed class Ula : IIo, IScreenWriteObserver
         var time = _cpu?.TStates ?? 0;
         var color = value & 0x07;
 
-        // The tape's edges up to now must reach the beeper before this speaker change.
-        Tape.AdvanceTo(time, Beeper);
+        // The other sources' changes up to now must reach the beeper before this speaker change.
+        AdvanceSounds(time);
 
         if (color != _border)
         {
@@ -224,17 +237,35 @@ public sealed class Ula : IIo, IScreenWriteObserver
     /// </summary>
     public void EndFrameSound(long now, int frameTStates)
     {
-        Tape.AdvanceTo(now, Beeper);
+        AdvanceSounds(now);
         Beeper.EndFrame(frameTStates);
-        Tape.EndFrame(frameTStates);
+        foreach (var source in _soundSources)
+        {
+            source.EndFrame(frameTStates);
+        }
+    }
+
+    /// <summary>Adds a sound source (setup only, not while running).</summary>
+    public void AddSoundSource(ISoundSource source) => _soundSources = [.. _soundSources, source];
+
+    /// <summary>Brings every sound source up to the CPU's current T-state, before a change to one of them.</summary>
+    public void CatchUpSound() => AdvanceSounds(_cpu?.TStates ?? 0);
+
+    private void AdvanceSounds(long time)
+    {
+        foreach (var source in _soundSources)
+        {
+            source.AdvanceTo(time, Beeper);
+        }
     }
 
     /// <summary>Finishes drawing the frame, then starts the next one: FLASH counter, border changes.</summary>
-    public void EndFrame(ReadOnlySpan<byte> memory)
+    /// <param name="screen">The displayed bank, as <see cref="SpectrumMemory.Screen"/>.</param>
+    public void EndFrame(ReadOnlySpan<byte> screen)
     {
         if (!Headless)
         {
-            RenderUpTo(long.MaxValue, memory);
+            RenderUpTo(long.MaxValue, screen);
         }
 
         _frameCount++;
@@ -251,12 +282,12 @@ public sealed class Ula : IIo, IScreenWriteObserver
     /// Draws, in beam order, every pixel the beam reaches at or before <paramref name="time"/>:
     /// border pixels one by one, screen pixels by groups of 8 (4 T-states).
     /// </summary>
-    private void RenderUpTo(long time, ReadOnlySpan<byte> memory)
+    private void RenderUpTo(long time, ReadOnlySpan<byte> screen)
     {
         for (; _row < FrameHeight; _row++, _column = 0)
         {
             var y = _row - BorderTop;
-            var lineStart = FirstPixelTState + ((long)y * LineTStates);
+            var lineStart = _timings.FirstPixelTState + ((long)y * _timings.LineTStates);
             var screenLine = y is >= 0 and < ScreenLayout.Height;
             var line = _frameBuffer.AsSpan(_row * FrameWidth, FrameWidth);
 
@@ -271,7 +302,7 @@ public sealed class Ula : IIo, IScreenWriteObserver
                 var x = _column - BorderLeft;
                 if (screenLine && x is >= 0 and < ScreenLayout.Width)
                 {
-                    DrawCell(line.Slice(_column, 8), x, y, memory);
+                    DrawCell(line.Slice(_column, 8), x, y, screen);
                     _column += 8;
                 }
                 else
@@ -289,10 +320,10 @@ public sealed class Ula : IIo, IScreenWriteObserver
         }
     }
 
-    private void DrawCell(Span<uint> cell, int x, int y, ReadOnlySpan<byte> memory)
+    private void DrawCell(Span<uint> cell, int x, int y, ReadOnlySpan<byte> screen)
     {
-        var pixels = memory[ScreenLayout.PixelAddress(x, y)];
-        var attribute = memory[ScreenLayout.AttributeAddress(x, y)];
+        var pixels = screen[ScreenLayout.PixelAddress(x, y) - ScreenLayout.BitmapAddress];
+        var attribute = screen[ScreenLayout.AttributeAddress(x, y) - ScreenLayout.BitmapAddress];
         var bright = (attribute & 0x40) != 0;
         var ink = Palette.Colors[Palette.Index(attribute & 0x07, bright)];
         var paper = Palette.Colors[Palette.Index((attribute >> 3) & 0x07, bright)];

@@ -21,8 +21,9 @@ const int MaxFramesPerRedraw = 4;
 const double TurboMillisecondsPerRedraw = 12;
 const string Title = "iSpectrum";
 
-var rom = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "roms", "48.rom"));
-var spectrum = new Spectrum48(rom);
+var rom48 = ReadRom("48.rom");
+var rom128 = (ReadRom("128-0.rom"), ReadRom("128-1.rom"));
+
 var keyboardInput = new KeyboardInput();
 var fileChooser = new FileChooser();
 var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
@@ -35,6 +36,10 @@ var fastLoad = false;
 var turbo = false;
 string? tapeName = null;
 var shownBlock = -1;
+
+// The model new machines are built as: Cmd+1 for the 48K, Cmd+2 for the 128K.
+var is128 = false;
+Spectrum spectrum = NewMachine();
 
 Raylib.SetConfigFlags(ConfigFlags.VSyncHint);
 Raylib.InitWindow(Ula.FrameWidth * Scale, Ula.FrameHeight * Scale, Title);
@@ -136,7 +141,8 @@ void RunFrame()
 bool IsLoading() => spectrum.AutoTyper.IsBusy || spectrum.Tape.IsPlaying;
 
 // Cmd+S saves a snapshot, Cmd+O chooses a file to open, Cmd+F shows the snapshot folder,
-// Cmd+L switches fast tape loading, Cmd+T switches turbo.
+// Cmd+L switches fast tape loading, Cmd+T switches turbo, Cmd+1 and Cmd+2 power on a 48K or a
+// 128K (Cmd+M is macOS's Minimize), Cmd+R resets.
 void HandleShortcuts()
 {
     if (!Raylib.IsKeyDown(KeyboardKey.LeftSuper) && !Raylib.IsKeyDown(KeyboardKey.RightSuper))
@@ -170,6 +176,15 @@ void HandleShortcuts()
         turbo = !turbo;
         Report(turbo ? "turbo while loading" : "normal speed while loading");
     }
+    else if (Raylib.IsKeyPressed(KeyboardKey.One) || Raylib.IsKeyPressed(KeyboardKey.Two))
+    {
+        is128 = Raylib.IsKeyPressed(KeyboardKey.Two);
+        Reset();
+    }
+    else if (Raylib.IsKeyPressed(KeyboardKey.R))
+    {
+        Reset();
+    }
 }
 
 bool CanOpen(string path) => Snapshot.IsSupported(path) || IsTape(path);
@@ -194,9 +209,9 @@ void InsertTape(string path)
     try
     {
         var tape = TapFile.Parse(File.ReadAllBytes(path));
-        var machine = new Spectrum48(rom) { FastLoad = fastLoad };
+        var machine = NewMachine();
         machine.Tape.Insert(tape);
-        machine.AutoTyper.Start(AutoTyper.LoadCommand, Spectrum48.BootFrames);
+        machine.LoadTapeAfterBoot();
         spectrum = machine;
         tapeName = Path.GetFileName(path);
         shownBlock = -1;
@@ -212,9 +227,15 @@ void LoadSnapshot(string path)
 {
     try
     {
-        var loaded = new Spectrum48(rom) { FastLoad = fastLoad };
-        Snapshot.Load(loaded, path, File.ReadAllBytes(path));
+        // The snapshot says which model it needs; the machine switches to it.
+        var data = File.ReadAllBytes(path);
+        var needs128 = Snapshot.IsSpectrum128(path, data);
+        Spectrum loaded = needs128
+            ? new Spectrum128(rom128.Item1, rom128.Item2) { FastLoad = fastLoad }
+            : new Spectrum48(rom48) { FastLoad = fastLoad };
+        Snapshot.Load(loaded, path, data);
         spectrum = loaded;
+        is128 = needs128;
         tapeName = null;
         Report(Path.GetFileName(path));
     }
@@ -237,6 +258,20 @@ void SaveSnapshot()
     {
         Report($"cannot save: {e.Message}");
     }
+}
+
+byte[] ReadRom(string name) => File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "roms", name));
+
+Spectrum NewMachine() => is128
+    ? new Spectrum128(rom128.Item1, rom128.Item2) { FastLoad = fastLoad }
+    : new Spectrum48(rom48) { FastLoad = fastLoad };
+
+// A freshly powered-on machine of the current model.
+void Reset()
+{
+    spectrum = NewMachine();
+    tapeName = null;
+    Report(is128 ? "ZX Spectrum 128K" : "ZX Spectrum 48K");
 }
 
 // Shows which block of the tape is loading, when that changes.

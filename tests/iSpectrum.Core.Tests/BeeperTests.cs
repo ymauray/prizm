@@ -13,7 +13,7 @@ public class BeeperTests
     public void QuietSpeaker_GivesSilence()
     {
         _beeper.StartFrame();
-        _beeper.EndFrame(Spectrum48.FrameTStates);
+        _beeper.EndFrame(SpectrumTimings.Spectrum48.FrameTStates);
 
         Assert.All(_beeper.Samples.ToArray(), sample => Assert.Equal(0, sample));
     }
@@ -26,7 +26,7 @@ public class BeeperTests
         for (var frame = 0; frame < 50; frame++)
         {
             _beeper.StartFrame();
-            _beeper.EndFrame(Spectrum48.FrameTStates);
+            _beeper.EndFrame(SpectrumTimings.Spectrum48.FrameTStates);
             total += _beeper.Samples.Length;
         }
 
@@ -38,7 +38,7 @@ public class BeeperTests
     {
         _beeper.StartFrame();
         _beeper.SetLevel((long)(TStatesPerSample / 2), high: true); // high for the second half of sample 0
-        _beeper.EndFrame(Spectrum48.FrameTStates);
+        _beeper.EndFrame(SpectrumTimings.Spectrum48.FrameTStates);
 
         // The filter passes the first step unchanged: half of the full amplitude (8000).
         Assert.InRange(_beeper.Samples[0], 3900, 4100);
@@ -52,7 +52,7 @@ public class BeeperTests
         ula.Beeper.StartFrame();
 
         ula.Out(0x00FE, 0x10);
-        ula.Beeper.EndFrame(Spectrum48.FrameTStates);
+        ula.Beeper.EndFrame(SpectrumTimings.Spectrum48.FrameTStates);
 
         Assert.True(ula.Beeper.Samples[0] > 0);
     }

@@ -11,162 +11,128 @@ GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
 
 ## 0. État d'avancement
 
-**Jalons 1 à 7 terminés** (tags Git `jalon-1` à `jalon-7`) : le Spectrum 48K démarre la ROM
-d'origine dans une fenêtre, on y tape du BASIC au clavier du Mac, le beeper se fait entendre, il
-charge et sauvegarde des snapshots, il charge des cassettes `.TAP` en temps réel (son et bandes
-de couleur dans la bordure) ou instantanément, et il reproduit la contention mémoire de l'ULA,
-avec une image dessinée au fil du faisceau. Deux jeux librement redistribuables de
-David Hembrow tournent : *Miner* (1983, `.z80`) et *Corona-V* (2020, `.tap`).
+**Jalons 1 à 8 terminés** (tags Git `jalon-1` à `jalon-8`) : iSpectrum émule le ZX Spectrum
+**48K** et le **128K** (mémoire paginée, puce son AY-3-8912). On y tape du BASIC au clavier du
+Mac, le son sort, il charge et sauvegarde des snapshots `.SNA` et `.Z80`, charge des cassettes
+`.TAP` en temps réel (son et bandes dans la bordure) ou instantanément, et reproduit la
+contention mémoire et le bus flottant de l'ULA, avec une image dessinée au fil du faisceau. Deux
+jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`) et *Corona-V*
+(2020, `.tap`).
 
-Ce qui existe :
+### Ce qui existe
 
 - `src/iSpectrum.Z80` : CPU complet — toutes les instructions, préfixes `CB`, `ED`, `DD`, `FD`,
-  `DDCB`, `FDCB`, opcodes non documentés, bits 3 et 5 des drapeaux, MEMPTR ; interruptions
-  IM 0/1/2, `HALT`, retard après `EI` ; registre interne « Q » (`SCF`/`CCF`) ; drapeaux des
-  instructions de bloc interrompues ; un point de contention à chaque cycle de bus, via
-  `IMemory.ContentionDelay`, `IMemory.IsContended` et `IIo.ContentionDelay` (0 par défaut).
-- `src/iSpectrum.Core` : `Contention48K` (table des délais de l'ULA), `Memory48K` (ROM protégée
-  en écriture, RAM `0x4000`-`0x7FFF` contendue), `Ula` (port `0xFE` : clavier
-  en lecture, bordure et haut-parleur en écriture ; bus flottant sur les ports impairs ; rendu de l'écran avec BRIGHT et FLASH), `Keyboard` et
-  `SpectrumKey` (matrice 8 demi-rangées × 5 touches), `Beeper` (échantillons audio de chaque
-  frame, haut-parleur et signal de cassette mélangés), `AutoTyper` (frappe de touches
-  programmée, par exemple `LOAD ""`), `Spectrum48` (frame de 69 888 T-states,
-  interruption tant que INT est maintenue), `ScreenLayout`, `Palette`.
-- `src/iSpectrum.App` : fenêtre Raylib-cs 960×768 (image ×3, sans filtrage) ; `KeyboardInput`
-  traduit le clavier du Mac en matrice Spectrum ; `AudioOutput` joue le beeper et donne la
-  cadence de l'émulation.
-- `SpectrumCharacters` (Core) : quelles touches Spectrum tapent un caractère donné.
-- `src/iSpectrum.Core/Tape` : `TapFile` (blocs d'un `.TAP`), `TapePlayer` (signal de cassette
-  sur l'entrée EAR).
-- `src/iSpectrum.Core/Snapshots` : `SnaFormat` (chargement et sauvegarde `.SNA` 48K),
-  `Z80Format` (chargement `.Z80` versions 1 à 3, 48K), `Snapshot` (choix d'après l'extension).
-- App : ouverture de snapshots et de cassettes en argument, par glisser-déposer ou Cmd+O
-  (sélecteur natif via `osascript`, `zenity` sous Linux) ; Cmd+S sauvegarde un `.SNA` dans
-  `~/Documents/iSpectrum`, Cmd+F ouvre ce dossier ; Cmd+L bascule chargement réel / rapide,
-  Cmd+T le turbo pendant un chargement. Messages dans le titre de la fenêtre (pas encore de
-  texte à l'écran).
-- Tests : suite FUSE (1356 tests, événements de bus compris), ZEXDOC, ZEXALL et les six
-  programmes de z80test (catégorie `Slow`), interruptions,
-  adressage écran, attributs, bordure, protection de la ROM, matrice clavier, et deux tests sur
-  la vraie ROM qui relisent l'écran en comparant chaque case à la police de la ROM : le message
-  de copyright au démarrage, puis `PRINT 2+2` et `PRINT "A+B=C"` tapés au clavier.
-- Snapshots : fichiers fabriqués dans le code (aucun jeu dans le dépôt) — en-têtes écrits à la
-  main d'après la description des formats, cas limites de la compression, et un programme BASIC
-  sauvegardé puis rechargé dans une machine neuve pour chaque format.
-- Beeper : silence, nombre d'échantillons sur 50 frames, moyenne dans un échantillon, et
-  `BEEP 1,0` joué par la vraie ROM, dont la hauteur (do, 261,6 Hz) est vérifiée.
-- Bordure : un changement de couleur apparaît à la position du faisceau où il a eu lieu.
-- Timing (Richard Butler) : 72 tests de durée d'instructions, en mémoire contendue ou non, et
-  de lecture du bus flottant, comparés aux mesures sur machine réelle ; ignorés si
-  `local/timing-tests/` est absent.
-- Bus flottant : octet lu selon la position dans la ligne, et lecture d'un port impair.
-- Contention : table des délais, durée exacte d'un `NOP` en RAM contendue ou non et d'un `OUT`
-  vers l'ULA, et une couleur changée en plein milieu d'une rangée de caractères, qui ne touche
-  que les lignes sous le faisceau.
-- Cassette : instant exact de chaque front du signal ; la vraie ROM charge par `LOAD ""` un
-  programme BASIC depuis le signal (bandes rouge/cyan et son du ton pilote vérifiés) ; le
-  chargement rapide charge le même programme, saute un bloc au mauvais drapeau et affiche
-  `R Tape loading error` sur une somme de contrôle fausse ; la frappe automatique de `LOAD ""`.
+  `DDCB`, `FDCB`, opcodes non documentés, bits 3 et 5 des drapeaux, MEMPTR, registre interne
+  « Q » ; interruptions IM 0/1/2, `HALT`, retard après `EI` ; un point de contention à chaque
+  cycle de bus (`IMemory.ContentionDelay`, `IMemory.IsContended`, `IIo.ContentionDelay`, 0 par
+  défaut).
+- `src/iSpectrum.Core`, la machine :
+  - `Spectrum` (base commune : CPU, ULA, cassette, boucle de frame, `Step`, chargement rapide,
+    mode `Headless`), `Spectrum48`, `Spectrum128` ;
+  - `SpectrumTimings` (horloge, frame, ligne, premier pixel, table de contention, par modèle) ;
+  - `SpectrumMemory` (vue du CPU et banque affichée par l'ULA), `Memory48K`, `Memory128K` ;
+  - `Ula` (port `0xFE` : clavier, EAR, bordure, haut-parleur ; bus flottant ; image) ;
+  - `Beeper` (mélangeur : haut-parleur, cassette, AY), `ISoundSource`, `Ay8912` ;
+  - `Keyboard`, `SpectrumKey`, `SpectrumCharacters`, `AutoTyper`, `ScreenLayout`, `Palette` ;
+  - `Tape/` : `TapFile`, `TapePlayer` ; `Snapshots/` : `SnaFormat`, `Z80Format`, `Snapshot`.
+- `src/iSpectrum.App` : fenêtre Raylib-cs 960×768 (image ×3) ; `KeyboardInput` (clavier du Mac
+  traduit), `AudioOutput` (son, et cadence de l'émulation), `HostShell` (sélecteur de fichier,
+  Finder). Raccourcis : voir `README.md`. Messages dans le titre de la fenêtre.
 
-Choix de comportement déjà faits (détaillés en commentaire dans le code) :
+### Tests
 
-- `SCF` / `CCF` : bits 3 et 5 pris dans `(Q xor F) or A`, comportement des Z80 Zilog. Q vaut F
-  si l'instruction précédente a écrit les drapeaux, 0 sinon ; `POP AF` et `EX AF,AF'` chargent F
-  sans le calculer et laissent Q à 0. Vérifié par z80ccf.
-- Instructions de bloc interrompues pendant une répétition (`LDIR`, `CPIR`, `INIR`, `OTIR` et
-  variantes) : bits 5 et 3 de F pris dans les bits 13 et 11 de PC ; pour les entrées-sorties, H
-  et P/V recalculés et MEMPTR = PC + 1 (David Banks, 2018, comme MAME). Vérifié par z80test ;
-  cinq cas FUSE, antérieurs à ces découvertes, suivent ici la machine réelle (voir le README
-  des tests FUSE).
-- `OUT (C),0` envoie 0 (Z80 NMOS du Spectrum).
-- Pendant l'acquittement d'une interruption, le bus de données lit `0xFF` : IM 0 se comporte
-  comme IM 1 (`RST 38h`), IM 2 lit son vecteur en `I × 256 + 0xFF`.
-- `Interrupt()` renvoie `false` si l'interruption est refusée ; `Spectrum48.RunFrame` la
-  redemande tant que INT est maintenue (32 premiers T-states de la frame).
-- Image de 320×256 : écran 256×192 et bordure de 32 pixels de chaque côté. La bordure réelle
-  est plus haute et asymétrique ; ce sera à revoir avec le rendu ligne par ligne.
-- L'image entière est rendue en fin de frame à partir de la mémoire (pas encore ligne par ligne).
-- Palette : 0xD7 par composante pour les couleurs normales, 0xFF pour les couleurs vives.
-- Port `0xFE` en lecture : bits 0-4 = demi-rangées choisies par les lignes A8-A15 à 0 ; bits
-  5 et 7 à 1 ; bit 6 (EAR) = signal de la cassette quand elle joue, sinon le bit 4 du dernier
-  `OUT` (carte « issue 3 ») : `0xBF` sans touche enfoncée, comme l'attend z80test.
-- Clavier du Mac **traduit par caractère**, quelle que soit la disposition : le système dit
-  quel caractère une touche a tapé (`"` = Maj+2 sur un clavier suisse), et l'App tient
-  enfoncées les touches Spectrum correspondantes (Symbol Shift + P) tant que la touche du Mac
-  l'est. Maj seule = Caps Shift ; Ctrl seul = Symbol Shift ; avec Ctrl enfoncé, les touches
-  sont lues par position (Raylib nomme les touches d'après le QWERTY américain, qui est aussi
-  la disposition du Spectrum). Option est laissée au système (elle tape `@`, `#`…). Touches
-  spéciales : voir `README.md`.
+- CPU : suite FUSE (1356 tests, événements de bus compris), ZEXDOC, ZEXALL et les six programmes
+  de z80test (catégorie `Slow`), interruptions.
+- Machine : adressage écran, attributs, bordure au fil du faisceau, contention, bus flottant,
+  mémoire 48K et 128K (pagination, verrou, banques contendues), clavier, beeper, AY (registres,
+  hauteur, enveloppes), cassette (fronts du signal), snapshots des deux modèles, mode sans
+  affichage.
+- Sur les vraies ROM, en relisant l'écran avec la police de la ROM : démarrage du 48K et du
+  menu 128K, `PRINT` tapé au clavier, `BEEP 1,0` (hauteur vérifiée), `PLAY "c"` dans le BASIC
+  128, `LOAD ""` depuis le signal et en mode rapide (48K, et « Tape Loader » du 128K), un
+  programme BASIC qui survit à une sauvegarde puis un chargement dans chaque format.
+- Timing (Richard Butler) : 72 tests de durée d'instructions et de bus flottant, comparés aux
+  mesures sur machine réelle ; ignorés si `local/timing-tests/` est absent.
+
+### Choix de comportement (détaillés en commentaire dans le code)
+
+CPU :
+
+- `SCF` / `CCF` : bits 3 et 5 pris dans `(Q xor F) or A` (Z80 Zilog). Q vaut F si l'instruction
+  précédente a écrit les drapeaux, 0 sinon ; `POP AF` et `EX AF,AF'` laissent Q à 0.
+- Instructions de bloc interrompues pendant une répétition : bits 5 et 3 de F pris dans les bits
+  13 et 11 de PC ; pour les entrées-sorties, H et P/V recalculés et MEMPTR = PC + 1 (David Banks,
+  2018, comme MAME). Cinq cas FUSE, antérieurs, suivent ici la machine réelle.
+- `OUT (C),0` envoie 0 (Z80 NMOS). Pendant l'acquittement d'une interruption le bus lit `0xFF` :
+  IM 0 se comporte comme IM 1, IM 2 lit son vecteur en `I × 256 + 0xFF`. L'acquittement n'est
+  pas contendu ; un `JR` non pris ne lit pas son déplacement (comme FUSE).
+- `Interrupt()` renvoie `false` si l'interruption est refusée ; la machine la redemande tant que
+  INT est maintenue (32 T-states sur le 48K, 36 sur le 128K).
+
+Timings et ULA :
+
+- 48K : 3,5 MHz, frame de 69 888 T-states, lignes de 224, premier pixel à 14 336, premier cycle
+  contendu à 14 335. 128K : 3,5469 MHz, 70 908, 228, 14 362 et 14 361 (d'après FUSE, dont le bus
+  flottant commence 26 T-states plus tard sur le 128K). Machines « early timing ».
+- Contention : motif 6, 5, 4, 3, 2, 1, 0, 0 par groupe de 8 T-states, sur les 128 premiers
+  T-states des 192 lignes d'écran ; RAM `0x4000`-`0x7FFF` sur le 48K, banques impaires sur le
+  128K. Points de contention du CPU et motif des entrées-sorties comme FUSE.
+- Bus flottant (ports impairs) : pixels en +3, attribut en +4, paire suivante en +5 et +6 dans
+  chaque groupe de 8 T-states d'une ligne, `0xFF` ailleurs ; le Z80 capture la donnée à la fin
+  du cycle d'entrée-sortie, 3 T-states après l'appel à `In` (seul décalage qui satisfait les
+  tests 35 à 37 de Richard Butler).
+- Image : 320×256 (écran 256×192 et bordure de 32 pixels). Changements de bordure horodatés ;
+  zone d'écran dessinée juste avant chaque écriture dans l'écran affiché, et le reste en fin de
+  frame. Approximations : bordure au pixel près (l'ULA procède par 8 pixels), bordure réelle
+  plus haute et asymétrique. Palette : 0xD7 (normal) et 0xFF (vif).
+- Port `0xFE` en lecture : demi-rangées du clavier sur les bits 0-4, bits 5 et 7 à 1, bit 6
+  (EAR) = signal de la cassette quand elle joue, sinon bit 4 du dernier `OUT` (carte « issue 3 »).
 - La RAM démarre à zéro.
-- `.SNA` : PC est sur la pile (chargement = RETN) ; la sauvegarde l'y pousse dans la copie de la
-  RAM sans modifier la machine, et échoue si SP ne laisse pas de place en RAM.
-- `.Z80` : le compteur de T-states des fichiers v3 est ignoré, la frame repart à 0 au chargement
-  (comme pour `.SNA`) ; les snapshots 128K et les autres machines sont refusés avec un message.
-- Son : seul le bit 4 du port `0xFE` pilote le haut-parleur (le bit 3, MIC, est ignoré).
-  Échantillons 16 bits mono à 44 100 Hz, chacun égal au niveau moyen pendant sa durée (environ
-  79 T-states), puis filtre passe-haut à un pôle contre la composante continue.
-- Cadence : c'est la carte son qui rythme l'émulation. La boucle se redessine avec la
-  synchronisation verticale (plafonnée à 120 Hz) et exécute des frames tant que moins de 2048
-  échantillons attendent dans le tampon circulaire (plus 2 × 1024 dans le flux Raylib, soit
-  environ 90 ms de latence). Sans périphérique audio, repli sur 50 images/s.
-- Clavier : les événements sont lus à chaque passage de la boucle (Raylib les efface au
-  suivant), et une touche traduite ou spéciale reste enfoncée jusqu'à ce qu'une frame l'ait vue.
-- Image dessinée d'après le faisceau : premier pixel de l'écran à 14 336 T-states, 224 T-states
-  par ligne, 2 pixels par T-state. Les changements de bordure sont horodatés ; la zone d'écran
-  est dessinée à la demande, juste avant chaque écriture dans la RAM d'écran (jusqu'au pixel
-  qui précède l'instant de l'écriture), et le reste en fin de frame. Approximations : l'ULA
-  réelle ne change la bordure que par paquets de 8 pixels, et quelques T-states de décalage
-  restent à caler sur des programmes de test.
-- Contention (48K) : motif 6, 5, 4, 3, 2, 1, 0, 0 par groupe de 8 T-states, sur les 128 premiers
-  T-states des 192 lignes d'écran, à partir du T-state 14 335, pour la RAM `0x4000`-`0x7FFF`.
-  Les points de contention du CPU (adresse de chaque cycle interne, motif des entrées-sorties
-  selon l'octet haut et le bit 0 du port) suivent FUSE, dont les tests les vérifient un par un.
-  L'acquittement d'une interruption n'est pas contendu (comme dans FUSE). Un `JR` non pris ne
-  lit pas son déplacement (comme FUSE).
-- Bus flottant : un port impair (que rien ne décode) renvoie l'octet que l'ULA lit à cet
-  instant : dans chaque groupe de 8 T-states d'une ligne d'écran, à partir de son premier pixel,
-  pixels en +3, attribut en +4, paire suivante en +5 et +6, `0xFF` ailleurs (comme FUSE). Le Z80
-  capture la donnée à la fin du cycle d'entrée-sortie, 3 T-states après l'appel à `In` : c'est
-  le seul décalage qui satisfait les tests 35 à 37 de Richard Butler.
-- Performances : environ 24 fois la vitesse réelle en jeu avec l'image et le son (1200 frames/s
-  en Release), 46 fois sans (`Headless`) ; ZEXDOC et ZEXALL prennent environ 50 s ; chaque
-  programme de z80test (20 à 45 min de temps Spectrum) quelques secondes.
-- Le turbo de l'App tourne sans image ni son, puis dessine une frame par affichage.
-- Cassette réelle : durées de la ROM (pilote 2168 T × 8063 avant un en-tête, × 3223 avant des
-  données ; synchronisation 667 + 735 ; bit 0 = 2 × 855, bit 1 = 2 × 1710 ; pause de 1 s).
-  Signal lu sur le bit 6 du port `0xFE` et mélangé au son à mi-volume. La cassette démarre
-  quand la ROM entre dans `LD-BYTES` (`0x0556`) et joue jusqu'au bout.
-- Chargement rapide : interception à `LD-BREAK` (`0x056B`), copie du bloc en IX, puis saut à la
-  fin de `LD-BYTES` (`0x05DF`) avec H = XOR de tous les octets, comme FUSE ; la ROM décide
-  elle-même du succès et gère les erreurs.
-- Une cassette ouverte dans l'App redémarre une machine neuve, qui tape `LOAD ""` après 100
-  frames. Par défaut : chargement réel ; le turbo tourne sans son, pendant 12 ms par affichage.
-- L'App charge un snapshot dans une machine neuve et ne remplace la machine en cours qu'en cas
-  de succès : un fichier invalide ne laisse jamais une machine à moitié chargée.
 
-Reste en suspens :
+128K :
 
-- NMI non implémentée (inutile sur un Spectrum sans interface).
-- Latence audio d'environ 90 ms : à réduire si elle gêne.
-- Les caractères du mode étendu (`[ ] { } ~ | \ ©`) ne sont pas traduits : il faudrait
-  enchaîner deux combinaisons. Les touches mortes (`^`, `¨`) et la frappe très rapide n'ont été
-  essayées qu'à la main.
-- Pas encore de fenêtre « À propos » : le copyright Amstrad n'est mentionné que dans
-  `README.md` et `roms/README.md`.
+- Port `0x7FFD` décodé sur A15 = 0 et A1 = 0 ; bits 0-2 banque en `0xC000`, bit 3 écran fantôme
+  (banque 7), bit 4 ROM, bit 5 verrou jusqu'au reset. L'image rattrape le faisceau avant un
+  changement d'écran. Non émulé : la lecture du port `0x7FFD`, qui sur le vrai 128K y écrit le
+  bus flottant.
+- AY : ports `0xFFFD` (A15 = A14 = 1, A1 = 0 ; sélection et relecture) et `0xBFFD` (A15 = 1,
+  A14 = 0, A1 = 0 ; écriture). Tics de 16 T-states (8 cycles AY), bruit et enveloppe un tic sur
+  deux ; volumes d'après la table mesurée d'ayumi (MIT). Registres 14-15 (ports d'E/S : RS-232,
+  pavé numérique) non reliés.
+- Chargement de cassette : « Tape Loader » du menu (ENTRÉE après 150 frames) ; les interceptions
+  de `LD-BYTES` ne s'appliquent que quand la ROM 1 est paginée.
 
-**Prochaine étape : suites de test tierces**, avant le jalon 8 :
+Son et App :
 
-1. ~~les tests de timing de Richard Butler (zxspectrum4.net)~~ : **faits** — les 72 tests passent
-   (machine « early timing »), y compris 35 à 37, qui mesurent le bus flottant ; le programme
-   et ses écrans restent dans `local/timing-tests/` (licence à vérifier) ;
-2. ~~z80test de Patrik Rak (MIT)~~ : **fait** — les six programmes passent, après l'ajout du
-   registre Q, des drapeaux des instructions de bloc interrompues et du bit EAR « issue 3 » ;
-3. ~~un mode sans affichage~~ : **fait** — `Spectrum48.Headless` (ni image ni son, machine
-   identique) double la vitesse ; utilisé par les harnais de test et le turbo de l'App ;
-4. `btime.tap`, `stime.tap`, `ulatest3.tap` (Spectrum Clone Design) : timing de la bordure, de
-   l'écran et du bus flottant, à vérifier à l'œil ; auteurs et licence à vérifier.
+- Mélange dans `Beeper` : haut-parleur (bit 4 du port `0xFE`, MIC ignoré), cassette à mi-volume,
+  AY ; chaque échantillon (44 100 Hz, 16 bits mono) est le niveau moyen pendant sa durée, puis
+  passe-haut à un pôle. Toutes les sources sont amenées au même T-state avant chaque événement.
+- Cadence donnée par la carte son (tampon de 2048 échantillons, environ 90 ms de latence) ;
+  affichage à la synchronisation verticale ; repli sur 50 images/s sans audio.
+- Clavier du Mac traduit par caractère (Maj+2 = `"` sur un clavier suisse) ; Maj seule = Caps
+  Shift, Ctrl seul = Symbol Shift, Ctrl + touche = par position ; événements lus à chaque
+  passage de la boucle, touche tenue jusqu'à ce qu'une frame l'ait vue.
+- Snapshots : `.SNA` 48K avec PC sur la pile ; `.SNA` 128K avec PC à part et la banque paginée
+  répétée si c'est la 2 ou la 5 ; `.Z80` versions 1 à 3, compteur de T-states ignoré. Un fichier
+  dit lui-même le modèle qu'il lui faut (`Snapshot.IsSpectrum128`) ; il est chargé dans une
+  machine neuve, qui ne remplace la machine en cours qu'en cas de succès.
+- Cassette réelle : durées de la ROM (pilote 2168 T × 8063 ou 3223, synchronisation 667 + 735,
+  bits 2 × 855 ou 2 × 1710, pause 1 s) ; elle démarre quand la ROM entre dans `LD-BYTES`.
+  Chargement rapide : interception à `0x056B` et saut à `0x05DF` avec H = XOR des octets (FUSE).
+  Turbo : frames sans image ni son pendant 12 ms, puis une frame dessinée.
+- Performances : environ 24 fois la vitesse réelle en jeu avec image et son, 46 fois sans.
 
-Ensuite, **jalon 8** : modèle 128K (pagination par le port `0x7FFD`, puce son AY-3-8912).
+### Reste en suspens
+
+- Barre de menu dessinée dans la fenêtre (prochaine étape) : les raccourcis deviennent nombreux.
+- NMI non implémentée ; +2A/+3, Pentagon et autres modèles non émulés.
+- Latence audio d'environ 90 ms, à réduire si elle gêne.
+- Caractères du mode étendu (`[ ] { } ~ | \ ©`) non traduits au clavier.
+- Tests visuels de l'ULA (`btime`, `stime`, `ulatest3`) : licence et références à trouver.
+- Pas encore de fenêtre « À propos » (copyright Amstrad : `README.md` et `roms/README.md`).
+
+**Prochaine étape** : la barre de menu dessinée dans la fenêtre, puis le **jalon 9** (débogueur
+intégré : désassembleur, points d'arrêt, vue mémoire et registres).
 
 ---
 
@@ -205,7 +171,8 @@ iSpectrum/
 ├── README.md
 └── roms/
     ├── README.md             # Provenance et copyright Amstrad
-    └── 48.rom                # ROM Sinclair/Amstrad (voir §8)
+    ├── 48.rom                # ROM du 48K (Sinclair/Amstrad, voir §8)
+    └── 128-0.rom, 128-1.rom  # ROM du 128K : éditeur et menu, BASIC 48K
 ```
 
 Principe : **le cœur (Z80 + Core) ne dépend d'aucune bibliothèque graphique**. Le front-end
@@ -357,7 +324,7 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 | 5 | Beeper | Le son fonctionne — **terminé** (`jalon-5`) |
 | 6 | `.TAP` : signal réel et chargement rapide | Chargement des cassettes courantes, avec son et bandes — **terminé** (`jalon-6`) |
 | 7 | Contention mémoire + rendu ligne par ligne | Démos et effets de bordure corrects — **terminé** (`jalon-7`), validation fine par des suites de test à venir |
-| 8 | Modèle 128K | Pagination (port `0x7FFD`) + puce son AY-3-8912 |
+| 8 | Modèle 128K | Pagination (port `0x7FFD`) + puce son AY-3-8912 — **terminé** (`jalon-8`) |
 | 9 | Débogueur intégré | Désassembleur, points d'arrêt, vue mémoire/registres |
 | 10 | `.TZX` | Chargeurs protégés / turbo (le signal de cassette existe depuis le jalon 6) |
 

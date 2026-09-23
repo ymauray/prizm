@@ -4,10 +4,11 @@
 namespace iSpectrum.Core.Snapshots;
 
 /// <summary>
-/// The .Z80 snapshot, versions 1 to 3, for 48K machines. Version 1 has a 30-byte header and the
-/// 48 KB of RAM, optionally compressed. Versions 2 and 3 (PC = 0 in the first header) add a
-/// second header, then 16 KB pages, each compressed or not: pages 8, 4 and 5 hold 0x4000,
-/// 0x8000 and 0xC000. 128K snapshots are refused until milestone 8.
+/// The .Z80 snapshot, versions 1 to 3, for the 48K and the 128K. Version 1 has a 30-byte header
+/// and the 48 KB of RAM, optionally compressed. Versions 2 and 3 (PC = 0 in the first header) add
+/// a second header, then 16 KB pages, each compressed or not. On the 48K pages 8, 4 and 5 hold
+/// 0x4000, 0x8000 and 0xC000; on the 128K pages 3 to 10 hold banks 0 to 7, and the second header
+/// also keeps the last write to port 0x7FFD and the AY's registers.
 /// </summary>
 /// <remarks>Reference: the .Z80 format description on World of Spectrum.</remarks>
 public static class Z80Format
@@ -15,7 +16,15 @@ public static class Z80Format
     private const int Version1HeaderLength = 30;
     private const int PageLength = 0x4000;
 
-    public static void Load(Spectrum48 spectrum, ReadOnlySpan<byte> data)
+    /// <summary>Whether a .Z80 file is a 128K snapshot (from the hardware mode of its second header).</summary>
+    public static bool IsSpectrum128(ReadOnlySpan<byte> data) =>
+        data.Length >= Version1HeaderLength + 2 + 23
+        && Word(data, 6) == 0
+        && Version(Word(data, 30)) is { } version
+        && Is128Hardware(version, data[34]);
+
+    /// <summary>Loads a snapshot into a machine of its model.</summary>
+    public static void Load(Spectrum spectrum, ReadOnlySpan<byte> data)
     {
         if (data.Length < Version1HeaderLength)
         {
@@ -28,11 +37,16 @@ public static class Z80Format
 
         if (pc != 0)
         {
-            LoadVersion1Ram(spectrum.Memory, data[Version1HeaderLength..], compressed: (flags & 0x20) != 0);
+            if (spectrum is not Spectrum48 spectrum48)
+            {
+                throw new NotSupportedException("Version 1 .Z80 snapshots are for the 48K.");
+            }
+
+            LoadVersion1Ram(spectrum48.Memory, data[Version1HeaderLength..], compressed: (flags & 0x20) != 0);
         }
         else
         {
-            pc = LoadVersion2Or3(spectrum.Memory, data);
+            pc = LoadVersion2Or3(spectrum, data);
         }
 
         var cpu = spectrum.Cpu;
@@ -80,7 +94,7 @@ public static class Z80Format
     }
 
     /// <summary>Loads the pages of a version 2 or 3 file and returns PC from its second header.</summary>
-    private static ushort LoadVersion2Or3(Memory48K memory, ReadOnlySpan<byte> data)
+    private static ushort LoadVersion2Or3(Spectrum spectrum, ReadOnlySpan<byte> data)
     {
         if (data.Length < Version1HeaderLength + 2)
         {
@@ -88,12 +102,8 @@ public static class Z80Format
         }
 
         var extraLength = Word(data, 30);
-        var version = extraLength switch
-        {
-            23 => 2,
-            54 or 55 => 3,
-            _ => throw new InvalidDataException($"Unknown .Z80 header length {extraLength}."),
-        };
+        var version = Version(extraLength)
+            ?? throw new InvalidDataException($"Unknown .Z80 header length {extraLength}.");
 
         var pagesStart = Version1HeaderLength + 2 + extraLength;
         if (data.Length < pagesStart)
@@ -101,12 +111,16 @@ public static class Z80Format
             throw new InvalidDataException("The file is too short for its version 2 or 3 header.");
         }
 
-        // Hardware 0 and 1 are 48K (with or without Interface 1) in both versions; in version 3,
-        // 3 is 48K with an M.G.T. interface. Everything else needs 128K or another machine.
         var hardware = data[34];
-        if (hardware is not (0 or 1) && !(version == 3 && hardware == 3))
+        var is128 = Is128Hardware(version, hardware);
+        if (!is128 && !Is48Hardware(version, hardware))
         {
-            throw new NotSupportedException($"Only 48K snapshots are supported (hardware mode {hardware}, version {version}).");
+            throw new NotSupportedException($"Hardware mode {hardware} (version {version}) is neither a 48K nor a 128K.");
+        }
+
+        if (is128 != spectrum is Spectrum128)
+        {
+            throw new NotSupportedException(is128 ? "This snapshot needs a 128K." : "This snapshot is for a 48K.");
         }
 
         var loaded = 0;
@@ -133,20 +147,6 @@ public static class Z80Format
             var block = data.Slice(position, stored);
             position += stored;
 
-            // Other pages (ROM, interface ROMs) are not part of the 48K RAM.
-            ushort? address = number switch
-            {
-                8 => 0x4000,
-                4 => 0x8000,
-                5 => 0xC000,
-                _ => null,
-            };
-
-            if (address is null)
-            {
-                continue;
-            }
-
             if (length == 0xFFFF)
             {
                 block.CopyTo(page);
@@ -156,17 +156,89 @@ public static class Z80Format
                 Decompress(block, page);
             }
 
-            memory.LoadRam(address.Value, page);
-            loaded |= 1 << number;
+            if (StorePage(spectrum, number, page))
+            {
+                loaded |= 1 << number;
+            }
         }
 
-        if (loaded != ((1 << 8) | (1 << 4) | (1 << 5)))
+        if (spectrum is Spectrum128 spectrum128)
+        {
+            if (loaded != 0b111_1111_1000)
+            {
+                throw new InvalidDataException("A 128K snapshot must contain pages 3 to 10.");
+            }
+
+            RestoreChips(spectrum128, data);
+        }
+        else if (loaded != ((1 << 8) | (1 << 4) | (1 << 5)))
         {
             throw new InvalidDataException("A 48K snapshot must contain pages 4, 5 and 8.");
         }
 
         return Word(data, 32);
     }
+
+    /// <summary>
+    /// Puts a page where it belongs; false for pages that are not RAM (ROMs, interface ROMs).
+    /// </summary>
+    private static bool StorePage(Spectrum spectrum, int number, ReadOnlySpan<byte> page)
+    {
+        if (spectrum is Spectrum128 spectrum128)
+        {
+            if (number is < 3 or > 10)
+            {
+                return false;
+            }
+
+            page.CopyTo(spectrum128.Memory.Bank(number - 3));
+            return true;
+        }
+
+        ushort? address = number switch
+        {
+            8 => 0x4000,
+            4 => 0x8000,
+            5 => 0xC000,
+            _ => null,
+        };
+
+        if (address is null)
+        {
+            return false;
+        }
+
+        ((Spectrum48)spectrum).Memory.LoadRam(address.Value, page);
+        return true;
+    }
+
+    /// <summary>The 128K's paging (byte 35) and the AY: registers at bytes 39-54, selected one at 38.</summary>
+    private static void RestoreChips(Spectrum128 spectrum, ReadOnlySpan<byte> data)
+    {
+        spectrum.Memory.WritePaging(data[35]);
+
+        for (var register = 0; register < 16; register++)
+        {
+            spectrum.Ay.SelectRegister((byte)register);
+            spectrum.Ay.WriteSelected(data[39 + register]);
+        }
+
+        spectrum.Ay.SelectRegister(data[38]);
+    }
+
+    private static int? Version(int extraLength) => extraLength switch
+    {
+        23 => 2,
+        54 or 55 => 3,
+        _ => null,
+    };
+
+    /// <summary>48K, 48K + Interface 1, and in version 3 48K + M.G.T.</summary>
+    private static bool Is48Hardware(int version, byte hardware) => hardware is 0 or 1 || (version == 3 && hardware == 3);
+
+    /// <summary>128K and 128K + Interface 1; in version 3 also 128K + M.G.T. (the numbers shift by one).</summary>
+    private static bool Is128Hardware(int version, byte hardware) =>
+        version == 2 ? hardware is 3 or 4 : hardware is 4 or 5 or 6;
 
     /// <summary>
     /// Expands <paramref name="source"/> until <paramref name="destination"/> is full. ED ED n b
