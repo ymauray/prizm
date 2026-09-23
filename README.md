@@ -1,8 +1,8 @@
 # iSpectrum
 
 Émulateur ZX Spectrum 48K écrit en C# (.NET 10), pensé d'abord pour macOS sur Apple Silicon.
-Il démarre la ROM d'origine jusqu'à l'écran « © 1982 Sinclair Research Ltd » ; le clavier,
-le son et le chargement de programmes viendront ensuite.
+Il démarre la ROM d'origine, et l'on peut taper et exécuter du BASIC au clavier du Mac ; le son
+et le chargement de programmes viendront ensuite.
 
 L'architecture, l'état d'avancement et le plan par jalons sont dans [`OVERVIEW.md`](OVERVIEW.md) ;
 les règles de contribution (y compris pour les agents de code) dans [`AGENTS.md`](AGENTS.md).

@@ -11,22 +11,25 @@ GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
 
 ## 0. État d'avancement
 
-**Jalons 1 et 2 terminés** (tags Git `jalon-1`, `jalon-2`) : le Spectrum 48K démarre la ROM
-d'origine et affiche « © 1982 Sinclair Research Ltd » dans une fenêtre. Il n'y a encore ni
-clavier, ni son, ni chargement de programmes.
+**Jalons 1 à 3 terminés** (tags Git `jalon-1` à `jalon-3`) : le Spectrum 48K démarre la ROM
+d'origine dans une fenêtre, et l'on peut taper et exécuter du BASIC au clavier du Mac. Il n'y a
+encore ni son, ni chargement de programmes.
 
 Ce qui existe :
 
 - `src/iSpectrum.Z80` : CPU complet — toutes les instructions, préfixes `CB`, `ED`, `DD`, `FD`,
   `DDCB`, `FDCB`, opcodes non documentés, bits 3 et 5 des drapeaux, MEMPTR ; interruptions
   IM 0/1/2, `HALT`, retard après `EI`.
-- `src/iSpectrum.Core` : `Memory48K` (ROM protégée en écriture), `Ula` (bordure via le port
-  `0xFE`, rendu de l'écran avec BRIGHT et FLASH), `Spectrum48` (frame de 69 888 T-states,
+- `src/iSpectrum.Core` : `Memory48K` (ROM protégée en écriture), `Ula` (port `0xFE` : clavier
+  en lecture, bordure en écriture ; rendu de l'écran avec BRIGHT et FLASH), `Keyboard` et
+  `SpectrumKey` (matrice 8 demi-rangées × 5 touches), `Spectrum48` (frame de 69 888 T-states,
   interruption tant que INT est maintenue), `ScreenLayout`, `Palette`.
-- `src/iSpectrum.App` : fenêtre Raylib-cs 960×768 (image ×3, sans filtrage), 50 images/s.
+- `src/iSpectrum.App` : fenêtre Raylib-cs 960×768 (image ×3, sans filtrage), 50 images/s ;
+  `KeyMap` traduit le clavier du Mac en matrice Spectrum à chaque frame.
 - Tests : suite FUSE (1356 tests), ZEXDOC et ZEXALL (catégorie `Slow`), interruptions,
-  adressage écran, attributs, bordure, protection de la ROM, et un test de démarrage qui relit
-  le message de copyright à l'écran en comparant chaque case à la police de la ROM.
+  adressage écran, attributs, bordure, protection de la ROM, matrice clavier, et deux tests sur
+  la vraie ROM qui relisent l'écran en comparant chaque case à la police de la ROM : le message
+  de copyright au démarrage, puis `PRINT 2+2` tapé au clavier, qui affiche `4`.
 
 Choix de comportement déjà faits (détaillés en commentaire dans le code) :
 
@@ -43,7 +46,11 @@ Choix de comportement déjà faits (détaillés en commentaire dans le code) :
   est plus haute et asymétrique ; ce sera à revoir avec le rendu ligne par ligne.
 - L'image entière est rendue en fin de frame à partir de la mémoire (pas encore ligne par ligne).
 - Palette : 0xD7 par composante pour les couleurs normales, 0xFF pour les couleurs vives.
-- Le port `0xFE` lit toujours `0xFF` (aucune touche enfoncée, pas de signal cassette).
+- Port `0xFE` en lecture : bits 0-4 = demi-rangées choisies par les lignes A8-A15 à 0 ; bits
+  5 et 7 à 1 ; bit 6 (EAR) à 1 tant que l'entrée cassette n'existe pas.
+- Clavier du Mac lu **par position** (Raylib nomme les touches d'après le QWERTY américain, qui
+  est aussi la disposition du Spectrum). Shift = Caps Shift ; Ctrl et Option = Symbol Shift ;
+  Retour arrière = DELETE ; Échap = BREAK (il ne ferme plus la fenêtre) ; flèches = curseurs.
 - La RAM démarre à zéro.
 
 Reste en suspens :
@@ -52,11 +59,14 @@ Reste en suspens :
   Il faudra horodater chaque accès, ce qui ira avec la contention (jalon 7).
 - NMI non implémentée (inutile sur un Spectrum sans interface).
 - Cadence réglée par `SetTargetFPS(50)` ; elle devra se caler sur l'audio au jalon 5.
+- Sur un clavier QWERTZ (suisse, allemand), Y et Z sont inversés ; sur AZERTY, A/Q, Z/W et M
+  aussi. Solution envisagée : faire suivre l'étiquette des touches pour les lettres (via GLFW).
 - Pas encore de fenêtre « À propos » : le copyright Amstrad n'est mentionné que dans
   `README.md` et `roms/README.md`.
 
-**Prochaine étape : jalon 3** — clavier : matrice 8 demi-rangées × 5 touches lue sur le port
-`0xFE` (octet haut de l'adresse), mapping du clavier Mac dans l'App, tests de la matrice.
+**Prochaine étape : jalon 4** — chargement des snapshots `.SNA` puis `.Z80` (versions 1 à 3)
+dans `iSpectrum.Core`, avec tests des chargeurs ; ouverture d'un fichier dans l'App (glisser-
+déposer). Les jeux de test personnels vont dans `local/`, jamais dans Git.
 
 ---
 
@@ -84,13 +94,13 @@ iSpectrum/
 ├── iSpectrum.sln
 ├── src/
 │   ├── iSpectrum.Z80/        # CPU Z80 pur, sans dépendance (IMemory, IIo)
-│   ├── iSpectrum.Core/       # Machine : mémoire, ULA, boucle de frame (clavier, son, formats à venir)
-│   └── iSpectrum.App/        # Front-end : fenêtre et rendu (Raylib-cs) ; audio, entrées à venir
+│   ├── iSpectrum.Core/       # Machine : mémoire, ULA, clavier, boucle de frame (son, formats à venir)
+│   └── iSpectrum.App/        # Front-end : fenêtre, rendu, clavier (Raylib-cs) ; audio à venir
 ├── tests/
 │   ├── iSpectrum.Z80.Tests/
 │   │   ├── Fuse/             # Suite FUSE + parseur et runner (provenance dans README.md)
 │   │   └── Zex/              # ZEXDOC/ZEXALL + harnais CP/M (provenance dans README.md)
-│   └── iSpectrum.Core.Tests/ # Écran, attributs, mémoire, démarrage ROM (clavier, SNA/Z80/TAP à venir)
+│   └── iSpectrum.Core.Tests/ # Écran, attributs, mémoire, clavier, ROM (SNA/Z80/TAP à venir)
 ├── local/                    # Ignoré par Git : fichiers de test personnels (jeux…)
 ├── README.md
 └── roms/
@@ -242,7 +252,7 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 |---|---|---|
 | 1 | CPU Z80 + harnais de tests | Tests FUSE et ZEXDOC/ZEXALL au vert — **terminé** (`jalon-1`) |
 | 2 | Mémoire + ROM + affichage écran | Message « © 1982 Sinclair Research Ltd » à l'écran — **terminé** (`jalon-2`) |
-| 3 | Clavier | On peut taper et exécuter du BASIC |
+| 3 | Clavier | On peut taper et exécuter du BASIC — **terminé** (`jalon-3`) |
 | 4 | Chargement `.SNA` / `.Z80` | Les premiers jeux tournent |
 | 5 | Beeper | Le son fonctionne |
 | 6 | `.TAP` (flash loading) | Chargement des cassettes courantes |
