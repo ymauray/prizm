@@ -3,7 +3,7 @@ namespace iSpectrum.Z80;
 /// <summary>
 /// Zilog Z80 CPU. Talks to the outside world only through <see cref="IMemory"/> and <see cref="IIo"/>.
 /// </summary>
-public sealed class Z80Cpu
+public sealed partial class Z80Cpu
 {
     private readonly IMemory _memory;
     private readonly IIo _io;
@@ -54,9 +54,75 @@ public sealed class Z80Cpu
         TStates = 0;
     }
 
-    /// <summary>Fetches, decodes and executes one instruction, adding its exact T-states.</summary>
-    public void Step() => throw new NotImplementedException();
-
     /// <summary>Maskable interrupt request (INT), raised by the ULA once per frame.</summary>
     public void Interrupt() => throw new NotImplementedException();
+
+    // Bus access. Each helper adds the T-states of its machine cycle, so an instruction's
+    // total is the sum of its cycles plus the explicit internal cycles (Internal).
+
+    /// <summary>Opcode fetch (M1): 4 T-states, increments the low 7 bits of R.</summary>
+    private byte FetchOpcode()
+    {
+        var opcode = _memory.Read(PC++);
+        R = (byte)((R & 0x80) | ((R + 1) & 0x7F));
+        TStates += 4;
+        return opcode;
+    }
+
+    private byte ReadByte(ushort address)
+    {
+        TStates += 3;
+        return _memory.Read(address);
+    }
+
+    private void WriteByte(ushort address, byte value)
+    {
+        TStates += 3;
+        _memory.Write(address, value);
+    }
+
+    private byte ReadOperand() => ReadByte(PC++);
+
+    private ushort ReadOperandWord()
+    {
+        var low = ReadOperand();
+        return (ushort)(low | (ReadOperand() << 8));
+    }
+
+    private byte ReadPort(ushort port)
+    {
+        TStates += 4;
+        return _io.In(port);
+    }
+
+    private void WritePort(ushort port, byte value)
+    {
+        TStates += 4;
+        _io.Out(port, value);
+    }
+
+    /// <summary>Internal cycles where the bus is idle.</summary>
+    private void Internal(int tStates) => TStates += tStates;
+
+    private void Push(ushort value)
+    {
+        WriteByte(--SP, (byte)(value >> 8));
+        WriteByte(--SP, (byte)value);
+    }
+
+    private ushort Pop()
+    {
+        var low = ReadByte(SP++);
+        return (ushort)(low | (ReadByte(SP++) << 8));
+    }
+
+    // Register pairs.
+
+    private ushort BC { get => (ushort)((B << 8) | C); set { B = (byte)(value >> 8); C = (byte)value; } }
+
+    private ushort DE { get => (ushort)((D << 8) | E); set { D = (byte)(value >> 8); E = (byte)value; } }
+
+    private ushort HL { get => (ushort)((H << 8) | L); set { H = (byte)(value >> 8); L = (byte)value; } }
+
+    private ushort AF { get => (ushort)((A << 8) | F); set { A = (byte)(value >> 8); F = (byte)value; } }
 }
