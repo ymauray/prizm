@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026 The iSpectrum contributors
 
+using iSpectrum.Core.Tape;
 using iSpectrum.Z80;
 
 namespace iSpectrum.Core;
@@ -46,8 +47,11 @@ public sealed class Ula : IIo
     /// <summary>The key matrix read through port 0xFE.</summary>
     public Keyboard Keyboard { get; } = new();
 
-    /// <summary>The speaker, driven by bit 4 of port 0xFE.</summary>
+    /// <summary>The speaker, driven by bit 4 of port 0xFE, which also plays the tape signal.</summary>
     public Beeper Beeper { get; } = new();
+
+    /// <summary>The tape deck, whose signal is read on bit 6 of port 0xFE (EAR).</summary>
+    public TapePlayer Tape { get; } = new();
 
     /// <summary>
     /// Border colour, 0-7, as last written to port 0xFE. Setting it directly (snapshot loading)
@@ -69,11 +73,20 @@ public sealed class Ula : IIo
 
     /// <summary>
     /// Any even port selects the ULA: bits 0-4 are the keyboard half-rows selected by the high
-    /// byte of the port address. Bits 5 and 7 read 1; bit 6 (EAR) reads 1 too until the tape
-    /// input exists. Odd ports have nothing behind them and read 0xFF.
+    /// byte of the port address, bit 6 is the EAR input (the tape signal while it plays, 1
+    /// otherwise), bits 5 and 7 read 1. Odd ports have nothing behind them and read 0xFF.
     /// </summary>
-    public byte In(ushort port) =>
-        (port & 1) == 0 ? (byte)(0xE0 | Keyboard.Read((byte)(port >> 8))) : (byte)0xFF;
+    public byte In(ushort port)
+    {
+        if ((port & 1) != 0)
+        {
+            return 0xFF;
+        }
+
+        Tape.AdvanceTo(_cpu?.TStates ?? 0, Beeper);
+        var ear = !Tape.IsPlaying || Tape.Level ? 0x40 : 0;
+        return (byte)(0xA0 | ear | Keyboard.Read((byte)(port >> 8)));
+    }
 
     /// <summary>Gives the ULA the CPU whose T-state count stamps border and speaker changes.</summary>
     public void Connect(Z80Cpu cpu) => _cpu = cpu;
@@ -92,6 +105,9 @@ public sealed class Ula : IIo
         var time = _cpu?.TStates ?? 0;
         var color = value & 0x07;
 
+        // The tape's edges up to now must reach the beeper before this speaker change.
+        Tape.AdvanceTo(time, Beeper);
+
         if (color != _border)
         {
             // Past the limit, later changes of this frame are drawn as they were not there.
@@ -106,6 +122,18 @@ public sealed class Ula : IIo
         }
 
         Beeper.SetLevel(time, (value & 0x10) != 0);
+    }
+
+    /// <summary>
+    /// Ends the sound of the frame: plays the tape up to <paramref name="now"/> (the CPU may have
+    /// run past the end of the frame), then closes the beeper's frame and makes times relative
+    /// to the next one.
+    /// </summary>
+    public void EndFrameSound(long now, int frameTStates)
+    {
+        Tape.AdvanceTo(now, Beeper);
+        Beeper.EndFrame(frameTStates);
+        Tape.EndFrame(frameTStates);
     }
 
     /// <summary>Renders the frame, then starts the next one: FLASH counter, border changes.</summary>

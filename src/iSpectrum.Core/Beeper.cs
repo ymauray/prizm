@@ -4,7 +4,8 @@
 namespace iSpectrum.Core;
 
 /// <summary>
-/// The speaker, driven by bit 4 of port 0xFE. Level changes are stamped with the CPU's T-state
+/// The speaker, driven by bit 4 of port 0xFE, and the tape signal, which reaches the speaker on
+/// the 48K too (that is the loading noise). Level changes are stamped with the CPU's T-state
 /// count; each output sample is the average level over its 1/44100 s (about 79 T-states), so
 /// fast toggling gives intermediate values instead of aliasing badly. A one-pole high-pass
 /// filter removes the constant part, so that the idle level and its changes do not click.
@@ -23,13 +24,17 @@ public sealed class Beeper
 
     private const double Amplitude = 8000;
 
+    /// <summary>Loudness of the tape signal relative to the speaker.</summary>
+    private const double TapeVolume = 0.5;
+
     /// <summary>High-pass coefficient: a time constant of about 200 samples (4.5 ms).</summary>
     private const double DcBlocking = 0.995;
 
     private readonly short[] _samples = new short[MaxSamplesPerFrame];
     private int _count;
 
-    private bool _level;
+    private bool _speaker;
+    private bool _tape;
 
     /// <summary>T-state (from the start of the frame) up to which the level has been integrated.</summary>
     private double _time;
@@ -37,8 +42,8 @@ public sealed class Beeper
     /// <summary>T-state at which the sample being built ends.</summary>
     private double _sampleEnd = TStatesPerSample;
 
-    /// <summary>Time spent at the high level within the sample being built.</summary>
-    private double _highTime;
+    /// <summary>Level integrated over time within the sample being built.</summary>
+    private double _area;
 
     private double _previousInput;
     private double _previousOutput;
@@ -53,8 +58,17 @@ public sealed class Beeper
     public void SetLevel(long tStates, bool high)
     {
         Advance(tStates);
-        _level = high;
+        _speaker = high;
     }
+
+    /// <summary>Records the tape signal level at <paramref name="tStates"/> in the current frame.</summary>
+    public void SetTapeLevel(long tStates, bool high)
+    {
+        Advance(tStates);
+        _tape = high;
+    }
+
+    private double Level => (_speaker ? 1 : 0) + (_tape ? TapeVolume : 0);
 
     /// <summary>
     /// Produces the samples up to the end of the frame, then makes the times relative to the next
@@ -76,26 +90,18 @@ public sealed class Beeper
 
         while (time >= _sampleEnd)
         {
-            if (_level)
-            {
-                _highTime += _sampleEnd - _time;
-            }
-
-            Emit(_highTime / TStatesPerSample);
-            _highTime = 0;
+            _area += Level * (_sampleEnd - _time);
+            Emit(_area / TStatesPerSample);
+            _area = 0;
             _time = _sampleEnd;
             _sampleEnd += TStatesPerSample;
         }
 
-        if (_level)
-        {
-            _highTime += time - _time;
-        }
-
+        _area += Level * (time - _time);
         _time = time;
     }
 
-    /// <summary>Filters and stores one sample; <paramref name="level"/> is the average level, 0 to 1.</summary>
+    /// <summary>Filters and stores one sample; <paramref name="level"/> is the average level.</summary>
     private void Emit(double level)
     {
         var input = level * Amplitude;
