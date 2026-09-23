@@ -1,8 +1,8 @@
 # iSpectrum
 
 Émulateur ZX Spectrum 48K écrit en C# (.NET 10), pensé d'abord pour macOS sur Apple Silicon.
-Il démarre la ROM d'origine, on y tape du BASIC au clavier du Mac, il charge les snapshots
-`.SNA` et `.Z80`, et le beeper se fait entendre ; les cassettes viendront ensuite.
+Il démarre la ROM d'origine, on y tape du BASIC au clavier du Mac, le beeper se fait entendre,
+et il charge snapshots (`.SNA`, `.Z80`) et cassettes (`.TAP`), en temps réel ou instantanément.
 
 L'architecture, l'état d'avancement et le plan par jalons sont dans [`OVERVIEW.md`](OVERVIEW.md) ;
 les règles de contribution (y compris pour les agents de code) dans [`AGENTS.md`](AGENTS.md).
@@ -34,13 +34,19 @@ Sur Mac, les touches F1 à F9 demandent Fn, sauf si elles sont réglées comme t
 standard dans les réglages du clavier. Les caractères du mode étendu (`[ ] { } ~ | \ ©`) se
 tapent comme sur le Spectrum : Tab, puis Ctrl + la touche. Pour quitter, fermez la fenêtre.
 
-## Snapshots
+## Snapshots et cassettes
 
-L'émulateur charge les snapshots `.SNA` et `.Z80` (48K) :
+L'émulateur ouvre les snapshots `.SNA` et `.Z80` (48K) et les cassettes `.TAP` :
 
 - glisser-déposer du fichier sur la fenêtre ;
 - **Cmd+O** : sélecteur de fichier (macOS ; `zenity` sous Linux) ;
-- en argument : `dotnet run --project src/iSpectrum.App -- jeu.z80`.
+- en argument : `dotnet run --project src/iSpectrum.App -- jeu.tap`.
+
+Une cassette redémarre la machine, qui tape `LOAD ""` d'elle-même. Par défaut, elle se charge
+**en temps réel**, comme en 1983 : son de chargement, bandes de couleur dans la bordure, et
+quelques minutes d'attente pour un gros jeu. **Cmd+T** accélère le chargement (sans le son),
+**Cmd+L** passe au chargement **rapide** (instantané, sans signal). Le titre de la fenêtre
+indique le bloc de la cassette en cours de lecture.
 
 **Cmd+S** sauvegarde l'état de la machine en `.SNA` dans `~/Documents/iSpectrum/`, et
 **Cmd+F** ouvre ce dossier dans le Finder. Les jeux ne doivent jamais être ajoutés au dépôt :
