@@ -48,6 +48,8 @@ public sealed class Memory48K : SpectrumMemory
 
     public override void Write(ushort address, byte value)
     {
+        Watch?.OnMemoryWrite(address, value);
+
         if (address < RomSize)
         {
             return;

@@ -26,6 +26,9 @@ public abstract class SpectrumMemory : IMemory
     /// <summary>Told before each write to the displayed screen, so the picture can catch up first.</summary>
     internal IScreenWriteObserver? ScreenObserver { get; set; }
 
+    /// <summary>Told about every write the CPU makes, including to ROM (debugger), when set.</summary>
+    internal IBusWatch? Watch { get; set; }
+
     public abstract byte Read(ushort address);
 
     public abstract void Write(ushort address, byte value);

@@ -33,6 +33,7 @@ public abstract class Spectrum
     private bool _frameStarting = true;
 
     private readonly SpectrumMemory _memory;
+    private readonly WatchedPorts _ports;
 
     /// <param name="io">The ports as the CPU sees them: the ULA, and whatever else the model decodes.</param>
     protected Spectrum(SpectrumTimings timings, SpectrumMemory memory, Ula ula, IIo io)
@@ -40,7 +41,8 @@ public abstract class Spectrum
         Timings = timings;
         _memory = memory;
         Ula = ula;
-        Cpu = new Z80Cpu(memory, io);
+        _ports = new WatchedPorts(io);
+        Cpu = new Z80Cpu(memory, _ports);
         Ula.Connect(Cpu, memory);
         memory.ScreenObserver = Ula;
     }
@@ -108,18 +110,24 @@ public abstract class Spectrum
     /// </summary>
     public void RunFrame()
     {
-        do
+        while (!Step())
         {
-            Step();
         }
-        while (!_frameStarting);
+    }
+
+    /// <summary>Tells a debugger about every memory write and port access, or stops telling (null).</summary>
+    internal void Watch(IBusWatch? watch)
+    {
+        _memory.Watch = watch;
+        _ports.Watch = watch;
     }
 
     /// <summary>
     /// Runs one instruction (after taking the interrupt if it is due), and ends the frame when
     /// its last T-state has passed. For debuggers and tests that stop in the middle of a frame.
     /// </summary>
-    public void Step()
+    /// <returns>Whether this instruction ended a frame.</returns>
+    public bool Step()
     {
         if (_frameStarting)
         {
@@ -158,7 +166,10 @@ public abstract class Spectrum
             Ula.EndFrame(Memory.Screen);
             _interruptTaken = false;
             _frameStarting = true;
+            return true;
         }
+
+        return false;
     }
 
     /// <summary>
@@ -216,5 +227,26 @@ public abstract class Spectrum
 
         // The byte after the data is the checksum.
         return index < block.Length ? (byte)(parity ^ block[index]) : (byte)0xFF;
+    }
+
+    /// <summary>The machine's ports as the CPU sees them, telling a debugger about each access.</summary>
+    private sealed class WatchedPorts(IIo io) : IIo
+    {
+        public IBusWatch? Watch { get; set; }
+
+        public byte In(ushort port)
+        {
+            var value = io.In(port);
+            Watch?.OnPortRead(port, value);
+            return value;
+        }
+
+        public void Out(ushort port, byte value)
+        {
+            Watch?.OnPortWrite(port, value);
+            io.Out(port, value);
+        }
+
+        public int ContentionDelay(ushort port, long tStates) => io.ContentionDelay(port, tStates);
     }
 }

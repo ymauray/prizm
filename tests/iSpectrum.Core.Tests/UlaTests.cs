@@ -104,6 +104,20 @@ public class UlaTests
     }
 
     [Fact]
+    public void DrawNow_ShowsTheMemoryAsItIsNow_WithoutAFrameEnding()
+    {
+        _memory[ScreenLayout.PixelAddress(0, 0)] = 0b1000_0000;
+        _memory[ScreenLayout.AttributeAddress(0, 0)] = (6 << 3) | 1;
+        _ula.Out(0x00FE, 0x02);
+
+        _ula.DrawNow(_memory.AsSpan(0x4000));
+
+        Assert.Equal(Color(1), Pixel(0, 0));
+        Assert.Equal(Color(6), Pixel(1, 0));
+        Assert.Equal(Color(2), _ula.FrameBuffer[0]);
+    }
+
+    [Fact]
     public void BorderChanges_StartOverAtTheNextFrame()
     {
         _ula.Out(0x00FE, 0x04);

@@ -57,6 +57,8 @@ public sealed class Memory128K : SpectrumMemory
 
     public override void Write(ushort address, byte value)
     {
+        Watch?.OnMemoryWrite(address, value);
+
         if (address < BankSize)
         {
             return;
