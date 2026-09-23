@@ -26,7 +26,7 @@ Ce qui existe :
   `IMemory.ContentionDelay`, `IMemory.IsContended` et `IIo.ContentionDelay` (0 par défaut).
 - `src/iSpectrum.Core` : `Contention48K` (table des délais de l'ULA), `Memory48K` (ROM protégée
   en écriture, RAM `0x4000`-`0x7FFF` contendue), `Ula` (port `0xFE` : clavier
-  en lecture, bordure et haut-parleur en écriture ; rendu de l'écran avec BRIGHT et FLASH), `Keyboard` et
+  en lecture, bordure et haut-parleur en écriture ; bus flottant sur les ports impairs ; rendu de l'écran avec BRIGHT et FLASH), `Keyboard` et
   `SpectrumKey` (matrice 8 demi-rangées × 5 touches), `Beeper` (échantillons audio de chaque
   frame, haut-parleur et signal de cassette mélangés), `AutoTyper` (frappe de touches
   programmée, par exemple `LOAD ""`), `Spectrum48` (frame de 69 888 T-states,
@@ -54,8 +54,10 @@ Ce qui existe :
 - Beeper : silence, nombre d'échantillons sur 50 frames, moyenne dans un échantillon, et
   `BEEP 1,0` joué par la vraie ROM, dont la hauteur (do, 261,6 Hz) est vérifiée.
 - Bordure : un changement de couleur apparaît à la position du faisceau où il a eu lieu.
-- Timing (Richard Butler) : 68 tests de durée d'instructions, en mémoire contendue ou non,
-  comparés aux mesures sur machine réelle ; ignorés si `local/timing-tests/` est absent.
+- Timing (Richard Butler) : 72 tests de durée d'instructions, en mémoire contendue ou non, et
+  de lecture du bus flottant, comparés aux mesures sur machine réelle ; ignorés si
+  `local/timing-tests/` est absent.
+- Bus flottant : octet lu selon la position dans la ligne, et lecture d'un port impair.
 - Contention : table des délais, durée exacte d'un `NOP` en RAM contendue ou non et d'un `OUT`
   vers l'ULA, et une couleur changée en plein milieu d'une rangée de caractères, qui ne touche
   que les lignes sous le faisceau.
@@ -114,6 +116,11 @@ Choix de comportement déjà faits (détaillés en commentaire dans le code) :
   selon l'octet haut et le bit 0 du port) suivent FUSE, dont les tests les vérifient un par un.
   L'acquittement d'une interruption n'est pas contendu (comme dans FUSE). Un `JR` non pris ne
   lit pas son déplacement (comme FUSE).
+- Bus flottant : un port impair (que rien ne décode) renvoie l'octet que l'ULA lit à cet
+  instant : dans chaque groupe de 8 T-states d'une ligne d'écran, à partir de son premier pixel,
+  pixels en +3, attribut en +4, paire suivante en +5 et +6, `0xFF` ailleurs (comme FUSE). Le Z80
+  capture la donnée à la fin du cycle d'entrée-sortie, 3 T-states après l'appel à `In` : c'est
+  le seul décalage qui satisfait les tests 35 à 37 de Richard Butler.
 - Performances : environ 26 fois la vitesse réelle en jeu (1300 frames/s en Release, contre
   1600 avant la contention) ; ZEXDOC et ZEXALL prennent environ 50 s au lieu de 40.
 - Cassette réelle : durées de la ROM (pilote 2168 T × 8063 avant un en-tête, × 3223 avant des
@@ -130,8 +137,6 @@ Choix de comportement déjà faits (détaillés en commentaire dans le code) :
 
 Reste en suspens :
 
-- Bus flottant non émulé : un port non décodé lit toujours `0xFF`, alors que le vrai 48K y
-  renvoie l'octet que l'ULA est en train de lire (quelques jeux s'en servent pour se synchroniser).
 - NMI non implémentée (inutile sur un Spectrum sans interface).
 - Latence audio d'environ 90 ms : à réduire si elle gêne.
 - Les caractères du mode étendu (`[ ] { } ~ | \ ©`) ne sont pas traduits : il faudrait
@@ -142,9 +147,9 @@ Reste en suspens :
 
 **Prochaine étape : suites de test tierces**, avant le jalon 8 :
 
-1. ~~les tests de timing de Richard Butler (zxspectrum4.net)~~ : **faits** — les 68 tests des
-   groupes 1 à 34 passent (machine « early timing ») ; les tests 35 à 37 attendent le bus
-   flottant ; le programme reste dans `local/timing-tests/` (licence à vérifier) ;
+1. ~~les tests de timing de Richard Butler (zxspectrum4.net)~~ : **faits** — les 72 tests passent
+   (machine « early timing »), y compris 35 à 37, qui mesurent le bus flottant ; le programme
+   et ses écrans restent dans `local/timing-tests/` (licence à vérifier) ;
 2. `btime.tap`, `stime.tap`, `ulatest3.tap` (Spectrum Clone Design) : timing de la bordure, de
    l'écran et du bus flottant, à vérifier à l'œil ; auteurs et licence à vérifier ;
 3. z80test de Patrik Rak (MIT) : tests CPU plus poussés que FUSE (dont `SCF`/`CCF` et le registre
