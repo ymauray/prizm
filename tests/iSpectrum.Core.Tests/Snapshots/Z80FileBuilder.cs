@@ -38,6 +38,36 @@ internal static class Z80FileBuilder
     }
 
     /// <summary>
+    /// A version 3 file for the 128K (hardware mode 4): pages 3 to 10 hold banks 0 to 7, byte 35
+    /// the last write to port 0x7FFD, bytes 38-54 the AY's selected register and its registers.
+    /// </summary>
+    public static byte[] Version3For128(Spectrum128 spectrum)
+    {
+        var extra = new byte[2 + 54];
+        extra[0] = 54;
+        extra[2] = (byte)spectrum.Cpu.PC;
+        extra[3] = (byte)(spectrum.Cpu.PC >> 8);
+        extra[4] = 4;
+        extra[5] = spectrum.Memory.LastPagingValue;
+        extra[8] = (byte)spectrum.Ay.SelectedRegister;
+        for (var register = 0; register < 16; register++)
+        {
+            extra[9 + register] = spectrum.Ay.Register(register);
+        }
+
+        var file = new List<byte>(Header(spectrum, pc: 0, compressed: false));
+        file.AddRange(extra);
+        for (var bank = 0; bank < 8; bank++)
+        {
+            var block = Compress(spectrum.Memory.Bank(bank));
+            file.AddRange([(byte)block.Length, (byte)(block.Length >> 8), (byte)(bank + 3)]);
+            file.AddRange(block);
+        }
+
+        return [.. file];
+    }
+
+    /// <summary>
     /// The .Z80 compression: runs of 5 or more equal bytes, and runs of 2 or more ED, become
     /// ED ED count byte; the byte right after a lone ED is never the start of a run.
     /// </summary>
@@ -79,7 +109,7 @@ internal static class Z80FileBuilder
         return [.. output];
     }
 
-    private static byte[] Header(Spectrum48 spectrum, ushort pc, bool compressed)
+    private static byte[] Header(Spectrum spectrum, ushort pc, bool compressed)
     {
         var cpu = spectrum.Cpu;
         var h = new byte[30];

@@ -99,10 +99,10 @@ public class Z80FormatTests
     }
 
     [Theory]
-    [InlineData(2, 3)] // 128K in version 2
-    [InlineData(3, 4)] // 128K in version 3
-    [InlineData(3, 7)] // +3
-    public void Version2And3_RefuseNon48KHardware(int version, byte hardware)
+    [InlineData(2, 3)] // 128K in version 2, on a 48K
+    [InlineData(3, 4)] // 128K in version 3, on a 48K
+    [InlineData(3, 7)] // +3, on no model
+    public void Version2And3_RefuseHardwareThatIsNotTheMachines(int version, byte hardware)
     {
         var file = new byte[32 + 54];
         file[30] = version == 2 ? (byte)23 : (byte)54;

@@ -9,8 +9,19 @@ public static class Snapshot
     /// <summary>Whether the file name has a snapshot extension this emulator can load.</summary>
     public static bool IsSupported(string fileName) => Extension(fileName) is ".sna" or ".z80";
 
-    /// <summary>Loads a snapshot into the machine; throws if the data is invalid or unsupported.</summary>
-    public static void Load(Spectrum48 spectrum, string fileName, ReadOnlySpan<byte> data)
+    /// <summary>Whether the snapshot is a 128K one: the machine to load it into must be a <see cref="Spectrum128"/>.</summary>
+    public static bool IsSpectrum128(string fileName, ReadOnlySpan<byte> data) => Extension(fileName) switch
+    {
+        ".sna" => SnaFormat.IsSpectrum128(data),
+        ".z80" => Z80Format.IsSpectrum128(data),
+        _ => false,
+    };
+
+    /// <summary>
+    /// Loads a snapshot into a machine of its model (see <see cref="IsSpectrum128"/>); throws if the
+    /// data is invalid or unsupported.
+    /// </summary>
+    public static void Load(Spectrum spectrum, string fileName, ReadOnlySpan<byte> data)
     {
         switch (Extension(fileName))
         {
