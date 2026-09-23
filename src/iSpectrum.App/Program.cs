@@ -227,9 +227,15 @@ void LoadSnapshot(string path)
 {
     try
     {
-        var loaded = new Spectrum48(rom48) { FastLoad = fastLoad };
-        Snapshot.Load(loaded, path, File.ReadAllBytes(path));
+        // The snapshot says which model it needs; the machine switches to it.
+        var data = File.ReadAllBytes(path);
+        var needs128 = Snapshot.IsSpectrum128(path, data);
+        Spectrum loaded = needs128
+            ? new Spectrum128(rom128.Item1, rom128.Item2) { FastLoad = fastLoad }
+            : new Spectrum48(rom48) { FastLoad = fastLoad };
+        Snapshot.Load(loaded, path, data);
         spectrum = loaded;
+        is128 = needs128;
         tapeName = null;
         Report(Path.GetFileName(path));
     }
@@ -245,13 +251,7 @@ void SaveSnapshot()
     {
         Directory.CreateDirectory(snapshotFolder);
         var path = Path.Combine(snapshotFolder, $"iSpectrum-{DateTime.Now:yyyyMMdd-HHmmss}.sna");
-        if (spectrum is not Spectrum48 spectrum48)
-        {
-            Report("128K snapshots cannot be saved yet");
-            return;
-        }
-
-        File.WriteAllBytes(path, SnaFormat.Save(spectrum48));
+        File.WriteAllBytes(path, SnaFormat.Save(spectrum));
         Report($"saved {path}");
     }
     catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidOperationException)
