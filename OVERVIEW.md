@@ -128,8 +128,10 @@ Choix de comportement déjà faits (détaillés en commentaire dans le code) :
   pixels en +3, attribut en +4, paire suivante en +5 et +6, `0xFF` ailleurs (comme FUSE). Le Z80
   capture la donnée à la fin du cycle d'entrée-sortie, 3 T-states après l'appel à `In` : c'est
   le seul décalage qui satisfait les tests 35 à 37 de Richard Butler.
-- Performances : environ 26 fois la vitesse réelle en jeu (1300 frames/s en Release, contre
-  1600 avant la contention) ; ZEXDOC et ZEXALL prennent environ 50 s au lieu de 40.
+- Performances : environ 24 fois la vitesse réelle en jeu avec l'image et le son (1200 frames/s
+  en Release), 46 fois sans (`Headless`) ; ZEXDOC et ZEXALL prennent environ 50 s ; chaque
+  programme de z80test (20 à 45 min de temps Spectrum) quelques secondes.
+- Le turbo de l'App tourne sans image ni son, puis dessine une frame par affichage.
 - Cassette réelle : durées de la ROM (pilote 2168 T × 8063 avant un en-tête, × 3223 avant des
   données ; synchronisation 667 + 735 ; bit 0 = 2 × 855, bit 1 = 2 × 1710 ; pause de 1 s).
   Signal lu sur le bit 6 du port `0xFE` et mélangé au son à mi-volume. La cassette démarre
@@ -159,9 +161,10 @@ Reste en suspens :
    et ses écrans restent dans `local/timing-tests/` (licence à vérifier) ;
 2. ~~z80test de Patrik Rak (MIT)~~ : **fait** — les six programmes passent, après l'ajout du
    registre Q, des drapeaux des instructions de bloc interrompues et du bit EAR « issue 3 » ;
-3. `btime.tap`, `stime.tap`, `ulatest3.tap` (Spectrum Clone Design) : timing de la bordure, de
-   l'écran et du bus flottant, à vérifier à l'œil ; auteurs et licence à vérifier ;
-4. un mode sans affichage (ni image ni son) pour les tests et le turbo, après mesure.
+3. ~~un mode sans affichage~~ : **fait** — `Spectrum48.Headless` (ni image ni son, machine
+   identique) double la vitesse ; utilisé par les harnais de test et le turbo de l'App ;
+4. `btime.tap`, `stime.tap`, `ulatest3.tap` (Spectrum Clone Design) : timing de la bordure, de
+   l'écran et du bus flottant, à vérifier à l'œil ; auteurs et licence à vérifier.
 
 Ensuite, **jalon 8** : modèle 128K (pagination par le port `0x7FFD`, puce son AY-3-8912).
 
