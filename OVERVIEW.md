@@ -254,11 +254,14 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 
 ## 8. La ROM (licence)
 
-Amstrad, détenteur des droits Sinclair depuis 1986, autorise la distribution des ROM du
-Spectrum **avec les émulateurs**, à condition que :
+Amstrad, détenteur des droits Sinclair depuis 1986, autorise la **redistribution** des ROM du
+Spectrum (autorisation informelle, donnée sur Usenet), à condition que :
 
 - le copyright reste celui d'Amstrad et soit mentionné (README / fenêtre « À propos ») ;
-- les ROM ne soient pas vendues en tant que telles.
+- les ROM ne soient ni vendues en tant que telles, ni intégrées dans du matériel. Un produit
+  payant qui les contient reste permis si l'on fait payer le produit, pas les ROM.
+
+La ROM n'est donc pas couverte par la licence du projet. Texte exact dans `roms/README.md`.
 
 Cela convient pour un projet personnel ou open source gratuit.
 Alternative entièrement libre : **OpenSE BASIC** (ROM de remplacement compatible, GPL).

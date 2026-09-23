@@ -23,8 +23,8 @@ dotnet test --filter "Category!=Slow"    # sans ZEXDOC ni ZEXALL, quelques secon
 ## ROM et fichiers tiers
 
 La ROM du Spectrum 48K (`roms/48.rom`) est © 1982 Sinclair Research Ltd, droits détenus par
-Amstrad plc, qui autorise sa distribution avec des émulateurs mais pas sa vente. Voir
-[`roms/README.md`](roms/README.md).
+Amstrad, et n'est pas couverte par la licence du projet. Amstrad autorise sa redistribution,
+mais pas sa vente ni son intégration dans du matériel. Voir [`roms/README.md`](roms/README.md).
 
 Les fichiers de test FUSE et ZEXDOC/ZEXALL sont sous licence GNU GPL v2 ou ultérieure ; leur
 provenance est décrite dans le `README.md` de leurs dossiers respectifs.
