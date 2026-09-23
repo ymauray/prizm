@@ -73,6 +73,7 @@ var texture = Raylib.LoadTextureFromImage(image);
 Raylib.UnloadImage(image);
 Raylib.SetTextureFilter(texture, TextureFilter.Point);
 using var font = new SpectrumFont(rom48);
+var aboutBox = new AboutBox(font);
 
 var source = new Rectangle(0, 0, Ula.FrameWidth, Ula.FrameHeight);
 var quit = false;
@@ -113,6 +114,10 @@ var menuBar = new MenuBar(
         new MenuItem("Step into", KeyboardKey.I, () => Debug(d => d.StepInto())),
         new MenuItem("Step over (next)", KeyboardKey.N, () => Debug(d => d.StepOver())),
         new MenuItem("Step out", KeyboardKey.U, () => Debug(d => d.StepOut())),
+    ]),
+    new Menu("Help",
+    [
+        new MenuItem("About iSpectrum", KeyboardKey.Null, aboutBox.Open),
     ]),
 ]);
 
@@ -156,8 +161,13 @@ while (!Raylib.WindowShouldClose() && !quit)
     }
 
     // Keyboard events must be read on every redraw: Raylib drops them at the next one. While
-    // the debugger is paused, they go to its command line instead.
-    if (!(showDebugger && debuggerPanel!.HasKeyboard))
+    // the About box is open, it takes them; while the debugger is paused, its command line does.
+    if (aboutBox.IsOpen)
+    {
+        aboutBox.Update();
+        spectrum.Keyboard.ReleaseAll();
+    }
+    else if (!(showDebugger && debuggerPanel!.HasKeyboard))
     {
         keyboardInput.Update(spectrum.Keyboard, spectrum.AutoTyper);
     }
@@ -223,6 +233,11 @@ while (!Raylib.WindowShouldClose() && !quit)
     {
         var destination = new Rectangle(0, MenuBar.Height, Raylib.GetScreenWidth(), Raylib.GetScreenHeight() - MenuBar.Height);
         Raylib.DrawTexturePro(texture, source, destination, Vector2.Zero, 0, Color.White);
+    }
+
+    if (aboutBox.IsOpen)
+    {
+        aboutBox.Draw(MenuBar.Height, Raylib.GetScreenWidth(), Raylib.GetScreenHeight() - MenuBar.Height);
     }
 
     menuBar.Draw(Raylib.GetScreenWidth());
