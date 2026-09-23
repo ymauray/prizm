@@ -95,8 +95,8 @@ contrairement à **File > Open**.
 programme (`SAVE "jeu"` crée `jeu.tap`). Comme sur une cassette laissée en enregistrement, les
 `SAVE` suivants s'ajoutent au même fichier ; **Tape > New recording** fait commencer le
 prochain dans un nouveau fichier. Un programme qui appelle la routine `SA-BYTES` de la ROM
-(`0x04C2`) est enregistré de la même façon. Les jeux ne doivent jamais être ajoutés au dépôt :
-rangez vos fichiers personnels dans `local/`, ignoré par Git.
+(`0x04C2`) est enregistré de la même façon. Ne jamais committer de jeux commerciaux ou de
+fichiers sous copyright dans le dépôt.
 
 ## Écrire ses programmes
 
@@ -105,8 +105,8 @@ iSpectrum est pensé pour développer en assembleur Z80 avec
 message par la ROM :
 
 ```sh
-mkdir -p local/build && cd local/build
-sjasmplus --sym=hello.sym ../../examples/hello.asm
+mkdir -p build && cd build
+sjasmplus --sym=hello.sym ../examples/hello.asm
 ```
 
 sjasmplus écrit dans le dossier courant `hello.sna` (un snapshot, pour développer : il se charge
@@ -145,14 +145,31 @@ dotnet test -c Release                   # tout, environ 50 s
 dotnet test --filter "Category!=Slow"    # sans ZEXDOC ni ZEXALL, quelques secondes
 ```
 
+### Tests de timing (Richard Butler)
+
+Les 72 tests de timing de Richard Butler (`TimingTests.cs`) vérifient la durée d'instructions en
+mémoire contendue et le bus flottant. Faute de licence open source formellement déclarée, leurs
+fichiers ne sont pas committés dans le dépôt (les tests sont automatiquement ignorés s'ils sont absents).
+
+Pour les exécuter, téléchargez `timing_tests_48k_v1.0.z80` et les quatre fichiers `.scr` associés depuis
+[EmulatorTestSuites](https://github.com/MrKWatkins/EmulatorTestSuites/tree/main/src/MrKWatkins.EmulatorTestSuites.ZXSpectrum/Timing)
+ou [zxspectrum4.net](https://www.zxspectrum4.net/op_timing.php), puis déposez-les dans `local/` :
+
+```sh
+mkdir -p local/timing-tests/screens
+# Déposez timing_tests_48k_v1.0.z80 dans local/timing-tests/
+# Déposez 35-contended.scr, 35-uncontended.scr, 36-contended.scr, 37-contended.scr dans local/timing-tests/screens/
+```
+
 ## ROM et fichiers tiers
 
 La ROM du Spectrum 48K (`roms/48.rom`) est © 1982 Sinclair Research Ltd, droits détenus par
 Amstrad, et n'est pas couverte par la licence du projet. Amstrad autorise sa redistribution,
 mais pas sa vente ni son intégration dans du matériel. Voir [`roms/README.md`](roms/README.md).
 
-Les fichiers de test FUSE et ZEXDOC/ZEXALL sont sous licence GNU GPL v2 ou ultérieure ; leur
-provenance est décrite dans le `README.md` de leurs dossiers respectifs.
+Les fichiers de test FUSE, ZEXDOC/ZEXALL, z80test et zxtests sont sous licence libre (GPL ou MIT) ;
+leur provenance est décrite dans le `README.md` de leurs dossiers respectifs. Les tests de timing de
+Richard Butler se déposent dans `local/timing-tests/` (voir section *Tester* ci-dessus).
 
 ## Licence
 

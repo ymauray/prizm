@@ -80,7 +80,9 @@ carte son), `SAVE` vers un `.TAP`, menu du bloc TZX « select », démarrage en 
   `SAVE` (en-tête et données identiques à ceux attendus, relus sur une autre machine, dans le
   BASIC 48 et le BASIC 128) et `SA-BYTES` appelé depuis du code machine.
 - Timing (Richard Butler) : 72 tests de durée d'instructions et de bus flottant, comparés aux
-  mesures sur machine réelle ; ignorés si `local/timing-tests/` est absent.
+  mesures sur machine réelle ; ignorés si `local/timing-tests/` est absent (déposer
+  `timing_tests_48k_v1.0.z80` et ses 4 écrans `.scr` dans `local/timing-tests/` depuis
+  <https://github.com/MrKWatkins/EmulatorTestSuites> ou <https://www.zxspectrum4.net/op_timing.php>).
 - Synchronisation ULA et bus flottant (Jan Bobrowski) : `btime.tap`, `stime.tap` et `ulatest3.tap`
   (GPL) intégrés dans `tests/iSpectrum.Core.Tests/ZxTests/`.
 
@@ -198,7 +200,7 @@ Souhaitable un jour, sans échéance :
 - la **Beta Disk** (disquettes TR-DOS `.TRD` et `.SCL`), le format de la plupart des démos de la
   scène. Il faudrait le timing du Pentagon (frame de 71 680 T-states, sans contention), le
   contrôleur WD1793, et la ROM TR-DOS, qu'on ne peut pas fournir faute de licence de
-  redistribution claire : l'utilisateur la mettrait dans `local/` ;
+  redistribution claire : l'utilisateur devrait la fournir ;
 - les formats de cassette **`.CSW`** (signal brut, déjà décodé dans le bloc TZX `0x18`) et
   **`.PZX`** ;
 - l'**accélération des chargeurs** : FUSE raccourcit les boucles des chargeurs qu'il
@@ -250,13 +252,13 @@ iSpectrum/
 │   └── iSpectrum.Core.Tests/
 │       ├── Z80Test/          # z80test de Patrik Rak, MIT (provenance dans README.md)
 │       ├── ZxTests/          # btime, stime, ulatest3 de Jan Bobrowski, GPL (README.md)
-│       ├── ThirdParty/       # Tests de timing de Richard Butler (fichiers dans local/)
+│       ├── ThirdParty/       # Tests de timing de Richard Butler (déposés dans local/timing-tests/)
 │       ├── Tape/Libspectrum/ # Fichiers TZX de libspectrum, GPL (provenance dans README.md)
 │       ├── Debugging/, Snapshots/, Tape/
 │       └── *.cs              # Écran, ULA, contention, mémoire, clavier, son, AY, ROM…
 ├── examples/
 │   └── hello.asm             # Premier programme pour sjasmplus
-├── local/                    # Ignoré par Git : jeux, fichiers de test tiers, builds
+├── local/                    # Ignoré par Git : timing_tests_48k_v1.0.z80 (voir README.md)
 └── roms/
     ├── README.md             # Provenance et copyright Amstrad
     ├── 48.rom                # ROM du 48K (Sinclair/Amstrad, voir §8)

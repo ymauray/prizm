@@ -75,9 +75,10 @@ machine et plan par jalons.
 - ROM 48K Sinclair/Amstrad dans `roms/` : redistribution autorisée par Amstrad, qui garde le
   copyright (à mentionner : README, fenêtre « À propos ») ; interdiction de vendre les ROM ou de
   les intégrer dans du matériel. Texte exact dans `roms/README.md`.
-- Fichiers de tests tiers (FUSE, ZEXDOC/ZEXALL) : conserver leurs licences et leur provenance
-  dans `tests/.../README.md`. Un fichier de test dont la licence n'est pas claire reste dans
-  `local/` ; les tests qui en dépendent sont alors ignorés s'il manque (voir
-  `tests/iSpectrum.Core.Tests/ThirdParty/LocalFile.cs`).
-- Ne jamais committer de jeux commerciaux ; les fichiers de test personnels vont dans un dossier
-  ignoré par Git (ex. `local/`).
+- Fichiers de tests tiers (FUSE, ZEXDOC/ZEXALL, z80test, zxtests) : conserver leurs licences et leur
+  provenance dans `tests/.../README.md`. Le dossier `local/` est réservé aux tests de timing de
+  Richard Butler (`timing_tests_48k_v1.0.z80` et ses 4 écrans `.scr` dans `local/timing-tests/`,
+  obtenus depuis <https://github.com/MrKWatkins/EmulatorTestSuites> ou <https://www.zxspectrum4.net/op_timing.php>)
+  dont la licence n'est pas formellement déclarée en open source. Les tests qui en dépendent sont
+  alors ignorés s'il manque (voir `tests/iSpectrum.Core.Tests/ThirdParty/LocalFile.cs` et `README.md`).
+- Ne jamais committer de jeux commerciaux ni de fichiers sous copyright.

@@ -6,6 +6,7 @@ obj/
 .vscode/
 .DS_Store
 TestResults/
+build/
 
-# Personal test files (games, snapshots): never committed
+# Fichiers de test tiers sans licence formelle (timing_tests_48k_v1.0.z80) :
 local/
