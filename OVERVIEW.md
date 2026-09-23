@@ -10,17 +10,22 @@ Projet personnel / open source d'émulateur ZX Spectrum écrit en C# (.NET).
 
 ## 0. État d'avancement
 
-**Jalon 1 terminé** (tag Git `jalon-1`) : le CPU Z80 est complet et validé. Il n'y a encore
-aucune machine autour : ni carte mémoire Spectrum, ni ROM, ni ULA, ni front-end. Les seules
-implémentations de `IMemory` et `IIo` sont des doublures de test (64 Ko de RAM à plat).
+**Jalons 1 et 2 terminés** (tags Git `jalon-1`, `jalon-2`) : le Spectrum 48K démarre la ROM
+d'origine et affiche « © 1982 Sinclair Research Ltd » dans une fenêtre. Il n'y a encore ni
+clavier, ni son, ni chargement de programmes.
 
 Ce qui existe :
 
-- `src/iSpectrum.Z80` : toutes les instructions, y compris les préfixes `CB`, `ED`, `DD`, `FD`,
-  `DDCB`, `FDCB`, les opcodes non documentés, les bits 3 et 5 des drapeaux et MEMPTR ;
-  interruptions IM 0/1/2, `HALT`, retard après `EI`.
-- `tests/iSpectrum.Z80.Tests` : suite FUSE (1356 tests), ZEXDOC et ZEXALL (catégorie `Slow`),
-  tests unitaires des interruptions et de l'état à la mise sous tension. Tout est au vert.
+- `src/iSpectrum.Z80` : CPU complet — toutes les instructions, préfixes `CB`, `ED`, `DD`, `FD`,
+  `DDCB`, `FDCB`, opcodes non documentés, bits 3 et 5 des drapeaux, MEMPTR ; interruptions
+  IM 0/1/2, `HALT`, retard après `EI`.
+- `src/iSpectrum.Core` : `Memory48K` (ROM protégée en écriture), `Ula` (bordure via le port
+  `0xFE`, rendu de l'écran avec BRIGHT et FLASH), `Spectrum48` (frame de 69 888 T-states,
+  interruption tant que INT est maintenue), `ScreenLayout`, `Palette`.
+- `src/iSpectrum.App` : fenêtre Raylib-cs 960×768 (image ×3, sans filtrage), 50 images/s.
+- Tests : suite FUSE (1356 tests), ZEXDOC et ZEXALL (catégorie `Slow`), interruptions,
+  adressage écran, attributs, bordure, protection de la ROM, et un test de démarrage qui relit
+  le message de copyright à l'écran en comparant chaque case à la police de la ROM.
 
 Choix de comportement déjà faits (détaillés en commentaire dans le code) :
 
@@ -31,21 +36,27 @@ Choix de comportement déjà faits (détaillés en commentaire dans le code) :
 - `OUT (C),0` envoie 0 (Z80 NMOS du Spectrum).
 - Pendant l'acquittement d'une interruption, le bus de données lit `0xFF` : IM 0 se comporte
   comme IM 1 (`RST 38h`), IM 2 lit son vecteur en `I × 256 + 0xFF`.
-- `Interrupt()` renvoie `false` si l'interruption est refusée (`DI`, ou juste après `EI`) ;
-  la machine pourra réessayer tant que l'ULA maintient INT (32 T-states).
+- `Interrupt()` renvoie `false` si l'interruption est refusée ; `Spectrum48.RunFrame` la
+  redemande tant que INT est maintenue (32 premiers T-states de la frame).
+- Image de 320×256 : écran 256×192 et bordure de 32 pixels de chaque côté. La bordure réelle
+  est plus haute et asymétrique ; ce sera à revoir avec le rendu ligne par ligne.
+- L'image entière est rendue en fin de frame à partir de la mémoire (pas encore ligne par ligne).
+- Palette : 0xD7 par composante pour les couleurs normales, 0xFF pour les couleurs vives.
+- Le port `0xFE` lit toujours `0xFF` (aucune touche enfoncée, pas de signal cassette).
+- La RAM démarre à zéro.
 
 Reste en suspens :
 
 - Les événements de bus de FUSE (`MR`, `MW`, `MC`, `PR`, `PW`, `PC`) sont lus mais pas comparés.
   Il faudra horodater chaque accès, ce qui ira avec la contention (jalon 7).
 - NMI non implémentée (inutile sur un Spectrum sans interface).
+- Cadence réglée par `SetTargetFPS(50)` ; elle devra se caler sur l'audio au jalon 5.
+- Pas encore de fenêtre « À propos » : le copyright Amstrad n'est mentionné que dans
+  `README.md` et `roms/README.md`.
 - Licence du projet non choisie. Les fichiers de test FUSE et ZEX sont sous GPL v2+.
-- Pas encore de `README.md` à la racine ; il deviendra nécessaire avec la ROM (mention du
-  copyright Amstrad, voir §8).
 
-**Prochaine étape : jalon 2** — créer `iSpectrum.Core` (carte mémoire 16 Ko ROM + 48 Ko RAM,
-ULA minimale, boucle de frame) et `iSpectrum.App` (fenêtre Raylib-cs), ajouter la ROM 48K
-dans `roms/`, jusqu'à afficher « © 1982 Sinclair Research Ltd ».
+**Prochaine étape : jalon 3** — clavier : matrice 8 demi-rangées × 5 touches lue sur le port
+`0xFE` (octet haut de l'adresse), mapping du clavier Mac dans l'App, tests de la matrice.
 
 ---
 
@@ -64,8 +75,6 @@ dans `roms/`, jusqu'à afficher « © 1982 Sinclair Research Ltd ».
 
 ## 2. Architecture de la solution
 
-Les éléments marqués *(à venir)* n'existent pas encore.
-
 ```
 iSpectrum/
 ├── AGENTS.md                 # Consignes pour les agents de code (CLAUDE.md y renvoie)
@@ -74,16 +83,18 @@ iSpectrum/
 ├── iSpectrum.sln
 ├── src/
 │   ├── iSpectrum.Z80/        # CPU Z80 pur, sans dépendance (IMemory, IIo)
-│   ├── iSpectrum.Core/       # (à venir) Machine : mémoire, ULA, clavier, beeper, formats
-│   └── iSpectrum.App/        # (à venir) Front-end : fenêtre, rendu, audio, entrées (Raylib-cs)
+│   ├── iSpectrum.Core/       # Machine : mémoire, ULA, boucle de frame (clavier, son, formats à venir)
+│   └── iSpectrum.App/        # Front-end : fenêtre et rendu (Raylib-cs) ; audio, entrées à venir
 ├── tests/
 │   ├── iSpectrum.Z80.Tests/
 │   │   ├── Fuse/             # Suite FUSE + parseur et runner (provenance dans README.md)
 │   │   └── Zex/              # ZEXDOC/ZEXALL + harnais CP/M (provenance dans README.md)
-│   └── iSpectrum.Core.Tests/ # (à venir) Adressage écran, clavier, chargement SNA/Z80/TAP
+│   └── iSpectrum.Core.Tests/ # Écran, attributs, mémoire, démarrage ROM (clavier, SNA/Z80/TAP à venir)
 ├── local/                    # Ignoré par Git : fichiers de test personnels (jeux…)
+├── README.md
 └── roms/
-    └── 48.rom                # (à venir) ROM Sinclair/Amstrad (voir §8)
+    ├── README.md             # Provenance et copyright Amstrad
+    └── 48.rom                # ROM Sinclair/Amstrad (voir §8)
 ```
 
 Principe : **le cœur (Z80 + Core) ne dépend d'aucune bibliothèque graphique**. Le front-end
@@ -229,7 +240,7 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 | # | Jalon | Résultat attendu |
 |---|---|---|
 | 1 | CPU Z80 + harnais de tests | Tests FUSE et ZEXDOC/ZEXALL au vert — **terminé** (`jalon-1`) |
-| 2 | Mémoire + ROM + affichage écran | Message « © 1982 Sinclair Research Ltd » à l'écran |
+| 2 | Mémoire + ROM + affichage écran | Message « © 1982 Sinclair Research Ltd » à l'écran — **terminé** (`jalon-2`) |
 | 3 | Clavier | On peut taper et exécuter du BASIC |
 | 4 | Chargement `.SNA` / `.Z80` | Les premiers jeux tournent |
 | 5 | Beeper | Le son fonctionne |
