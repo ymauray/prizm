@@ -31,6 +31,9 @@ var rom128 = (ReadRom("128-0.rom"), ReadRom("128-1.rom"));
 
 var keyboardInput = new KeyboardInput();
 var fileChooser = new FileChooser();
+
+// Whether the file being chosen is a tape to put in the running machine (Tape > Insert tape).
+var choosingTape = false;
 var documents = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
 var snapshotFolder = Path.Combine(documents, "iSpectrum");
 var turboTimer = new Stopwatch();
@@ -95,6 +98,10 @@ var menuBar = new MenuBar(
     ]),
     new Menu("Tape",
     [
+        new MenuItem("Insert tape...", KeyboardKey.O, ChooseTape, Shift: true),
+        new MenuItem("Play / Stop", KeyboardKey.P, PlayOrStopTape, () => spectrum.Tape.IsPlaying, Shift: true),
+        new MenuItem("Rewind", KeyboardKey.Null, RewindTape),
+        MenuItem.Separator,
         new MenuItem("Fast loading", KeyboardKey.L, ToggleFastLoad, () => fastLoad),
         new MenuItem("Turbo while loading", KeyboardKey.T, ToggleTurbo, () => turbo),
     ]),
@@ -131,7 +138,14 @@ while (!Raylib.WindowShouldClose() && !quit)
 
     if (fileChooser.PollResult() is { } chosen)
     {
-        Open(chosen);
+        if (choosingTape)
+        {
+            SwapTape(chosen);
+        }
+        else
+        {
+            Open(chosen);
+        }
     }
 
     menuBar.HandleShortcuts();
@@ -308,9 +322,19 @@ void Reload()
 // Typing LOAD "" or playing the tape: what turbo speeds up.
 bool IsLoading() => spectrum.AutoTyper.IsBusy || spectrum.Tape.IsPlaying;
 
-void ChooseFile()
+void ChooseFile() => OpenChooser(forTape: false);
+
+void ChooseTape() => OpenChooser(forTape: true);
+
+void OpenChooser(bool forTape)
 {
-    if (!fileChooser.IsOpen && !fileChooser.TryOpen(Directory.Exists(snapshotFolder) ? snapshotFolder : documents))
+    if (fileChooser.IsOpen)
+    {
+        return;
+    }
+
+    choosingTape = forTape;
+    if (!fileChooser.TryOpen(Directory.Exists(snapshotFolder) ? snapshotFolder : documents))
     {
         Report("no file chooser on this system: drop a file on the window instead");
     }
@@ -320,6 +344,33 @@ void SwitchModel(bool to128)
 {
     is128 = to128;
     Reset();
+}
+
+// The ROM starts the tape by itself; a turbo loader may need a hand, after a block that stops it.
+void PlayOrStopTape()
+{
+    var tape = spectrum.Tape;
+    if (tape.IsPlaying)
+    {
+        tape.Stop();
+        Report("tape stopped");
+    }
+    else if (tape.AtEnd)
+    {
+        Report(tapeName is null ? "no tape" : "end of tape: rewind it first");
+    }
+    else
+    {
+        tape.Play(spectrum.Cpu.TStates);
+        Report("tape playing");
+    }
+}
+
+void RewindTape()
+{
+    spectrum.Tape.Rewind();
+    shownBlock = -1;
+    Report("tape rewound");
 }
 
 void ToggleFastLoad()
@@ -337,7 +388,7 @@ void ToggleTurbo()
 
 bool CanOpen(string path) => Snapshot.IsSupported(path) || IsTape(path);
 
-bool IsTape(string path) => Path.GetExtension(path).Equals(".tap", StringComparison.OrdinalIgnoreCase);
+bool IsTape(string path) => TapeImage.IsSupported(path);
 
 void Open(string path)
 {
@@ -358,13 +409,36 @@ void InsertTape(string path)
 {
     try
     {
-        var tape = TapFile.Parse(File.ReadAllBytes(path));
+        var tape = TapeImage.Load(path, File.ReadAllBytes(path));
         var machine = NewMachine();
         machine.Tape.Insert(tape);
         machine.LoadTapeAfterBoot();
         SetMachine(machine);
         tapeName = Path.GetFileName(path);
         shownBlock = -1;
+    }
+    catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
+    {
+        Report($"cannot load {Path.GetFileName(path)}: {e.Message}");
+    }
+}
+
+// Puts another tape in the deck of the running machine, stopped at its start: the next side of
+// a game that loads in several parts. Unlike Open, the machine is not restarted.
+void SwapTape(string path)
+{
+    if (!IsTape(path))
+    {
+        Report($"{Path.GetFileName(path)} is not a tape");
+        return;
+    }
+
+    try
+    {
+        spectrum.Tape.Insert(TapeImage.Load(path, File.ReadAllBytes(path)));
+        tapeName = Path.GetFileName(path);
+        shownBlock = -1;
+        Report($"{tapeName} inserted");
     }
     catch (Exception e) when (e is IOException or UnauthorizedAccessException or InvalidDataException)
     {

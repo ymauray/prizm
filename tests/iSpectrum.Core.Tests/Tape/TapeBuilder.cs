@@ -48,4 +48,36 @@ internal static class TapeBuilder
 
         return TapFile.Parse(file.ToArray());
     }
+
+    /// <summary>A .TZX file made of the given blocks (each with its ID).</summary>
+    public static TapeImage Tzx(params byte[][] blocks)
+    {
+        var file = new List<byte>("ZXTape!\u001A"u8.ToArray()) { 1, 20 };
+        foreach (var block in blocks)
+        {
+            file.AddRange(block);
+        }
+
+        return TzxFile.Parse(file.ToArray());
+    }
+
+    /// <summary>TZX block 0x10: a block saved by the ROM, then a pause.</summary>
+    public static byte[] StandardBlock(byte[] block, int pauseMs = 1000) =>
+        [0x10, .. Word(pauseMs), .. Word(block.Length), .. block];
+
+    /// <summary>TZX block 0x11: a data block with its own bit timings.</summary>
+    public static byte[] TurboBlock(byte[] block, int zeroPulse, int onePulse, int pilotPulses = TapePlayer.DataPilotPulses, int pauseMs = 1000) =>
+    [
+        0x11, .. Word(TapePlayer.PilotPulse), .. Word(TapePlayer.FirstSyncPulse), .. Word(TapePlayer.SecondSyncPulse),
+        .. Word(zeroPulse), .. Word(onePulse), .. Word(pilotPulses), 8, .. Word(pauseMs),
+        (byte)block.Length, (byte)(block.Length >> 8), (byte)(block.Length >> 16), .. block,
+    ];
+
+    /// <summary>TZX block 0x20: a pause; 0 stops the tape.</summary>
+    public static byte[] PauseBlock(int pauseMs) => [0x20, .. Word(pauseMs)];
+
+    /// <summary>TZX block 0x30: a text description.</summary>
+    public static byte[] TextBlock(string text) => [0x30, (byte)text.Length, .. text.Select(c => (byte)c)];
+
+    private static byte[] Word(int value) => [(byte)value, (byte)(value >> 8)];
 }

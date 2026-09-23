@@ -42,14 +42,14 @@ internal sealed class FileChooser
             start.FileName = "osascript";
             start.ArgumentList.Add("-e");
             start.ArgumentList.Add(
-                $"POSIX path of (choose file with prompt \"Choose a snapshot or tape to load\" of type {{\"sna\", \"z80\", \"tap\"}} " +
+                $"POSIX path of (choose file with prompt \"Choose a snapshot or tape to load\" of type {{\"sna\", \"z80\", \"tap\", \"tzx\"}} " +
                 $"default location (POSIX file \"{location}\"))");
         }
         else if (OperatingSystem.IsLinux())
         {
             start.FileName = "zenity";
             start.ArgumentList.Add("--file-selection");
-            start.ArgumentList.Add("--file-filter=Snapshots and tapes | *.sna *.SNA *.z80 *.Z80 *.tap *.TAP");
+            start.ArgumentList.Add("--file-filter=Snapshots and tapes | *.sna *.SNA *.z80 *.Z80 *.tap *.TAP *.tzx *.TZX");
             start.ArgumentList.Add($"--filename={folder}/");
         }
         else

@@ -4,9 +4,9 @@
 namespace iSpectrum.Core.Tape;
 
 /// <summary>
-/// Plays a tape as the signal the Spectrum reads on its EAR input, with the pulse lengths the ROM
-/// saves: a pilot tone, two sync pulses, then two pulses per bit (most significant bit first),
-/// and a one-second pause after each block. Each pulse ends with an edge (the level flips).
+/// The tape deck: plays a tape as the signal the Spectrum reads on its EAR input. The ROM saves
+/// a pilot tone, two sync pulses, then two pulses per bit (most significant bit first); a .TAP
+/// file adds a one-second pause after each block, a .TZX file gives its own timings.
 /// </summary>
 /// <remarks>Timings: The Complete Spectrum ROM Disassembly, and the TZX format description.</remarks>
 public sealed class TapePlayer : ISoundSource
@@ -20,197 +20,182 @@ public sealed class TapePlayer : ISoundSource
     public const int OnePulse = 1710;
     public const int PauseTStates = 3_500_000;
 
-    private enum Phase
-    {
-        Stopped,
-        Pilot,
-        FirstSync,
-        SecondSync,
-        Data,
-        Pause,
-    }
+    /// <summary>The clock tape timings are given in (TZX, CSW): the 48K's.</summary>
+    public const int ClockHz = 3_500_000;
 
-    private IReadOnlyList<byte[]> _blocks = [];
-    private Phase _phase;
-    private int _block;
-    private int _pulsesLeft;
-    private int _byte;
-    private int _bitMask;
-    private bool _secondHalf;
+    /// <summary>
+    /// Edges without duration in a row beyond which the tape is stopped: a tape whose loops or
+    /// jumps go round without ever making a sound would otherwise hang the emulator.
+    /// </summary>
+    private const int MaxSilentEdges = 100_000;
+
+    /// <summary>How long the last level is held when the tape stops by itself (1 ms).</summary>
+    private const int StopHold = 3500;
+
+    // Loader detection, after FUSE (loader.c): reads of the ULA port this close together
+    // (T-states), each with B one more or one less than the last, in a row.
+    private const int LoaderReadInterval = 500;
+    private const int LoaderReads = 10;
+
+    private TapeImage _tape = new([]);
+    private TapeCursor _cursor = new(new([]));
+    private bool _playing;
+
+    /// <summary>Set by an edge after which the deck stops (end of tape, stop block).</summary>
+    private bool _stopAfterEdge;
 
     /// <summary>T-state (from the start of the current frame) of the next edge.</summary>
     private long _nextEdge;
 
+    /// <summary>The last read of the ULA port (T-state of the current frame) and B at that time.</summary>
+    private long _lastRead = -100_000;
+    private byte _lastB;
+    private int _loaderReads;
+
     /// <summary>The level on the EAR input.</summary>
     public bool Level { get; private set; }
 
-    public bool IsPlaying => _phase != Phase.Stopped;
+    public bool IsPlaying => _playing;
 
-    public int BlockCount => _blocks.Count;
+    public int BlockCount => _tape.Blocks.Count;
 
     /// <summary>Index of the block being played, or about to be; equal to BlockCount at the end.</summary>
-    public int CurrentBlock => _block;
+    public int CurrentBlock => _cursor.Block;
 
-    public bool AtEnd => _block >= _blocks.Count;
+    public bool AtEnd => _cursor.AtEnd;
 
-    public void Insert(TapFile tape)
+    /// <summary>Whether the machine is a 48K, on which the TZX block "stop the tape if in 48K mode" stops the tape.</summary>
+    public bool Is48K { get; set; } = true;
+
+    public void Insert(TapFile tape) => Insert(TapeImage.FromTap(tape));
+
+    public void Insert(TapeImage tape)
     {
-        _blocks = tape.Blocks;
+        _tape = tape;
+        _cursor = new TapeCursor(tape);
         Rewind();
     }
 
-    public void Eject()
-    {
-        _blocks = [];
-        Rewind();
-    }
+    public void Eject() => Insert(new TapeImage([]));
 
     public void Rewind()
     {
-        _phase = Phase.Stopped;
-        _block = 0;
+        _playing = false;
+        _stopAfterEdge = false;
+        _loaderReads = 0;
+        _cursor.Rewind();
         Level = false;
     }
 
     /// <summary>Starts playing the current block at <paramref name="now"/> (a T-state of the current frame).</summary>
     public void Play(long now)
     {
-        if (!IsPlaying && !AtEnd)
+        if (!_playing && !AtEnd)
         {
-            StartBlock(now);
+            _playing = true;
+            _stopAfterEdge = false;
+            _nextEdge = now;
         }
     }
 
-    public void Stop() => _phase = Phase.Stopped;
+    public void Stop() => _playing = false;
 
     /// <summary>
-    /// Takes the current block whole, without playing it, and moves to the next one: for fast
-    /// loading, which copies blocks straight into memory.
+    /// Called on each read of the ULA port, with the CPU's B register: starts the tape when a
+    /// program reads it as loaders do, in a tight loop that counts in B, as the ROM's own
+    /// LD-EDGE. Turbo loaders start this way, as a user would press "play" for them. The tape
+    /// is not stopped when the reads stop: loaders that count elsewhere would lose it.
+    /// </summary>
+    public void OnPortRead(long now, byte b)
+    {
+        var interval = now - _lastRead;
+        var step = (byte)(b - _lastB);
+        _lastRead = now;
+        _lastB = b;
+
+        if (_playing || AtEnd || interval > LoaderReadInterval || (step != 1 && step != 0xFF))
+        {
+            _loaderReads = 0;
+        }
+        else if (++_loaderReads >= LoaderReads)
+        {
+            Play(now);
+        }
+    }
+
+    /// <summary>
+    /// For fast loading, which copies blocks straight into memory: takes the next block whole,
+    /// without playing it, if the ROM can read it (a data block at the ROM's speed), passing
+    /// over blocks without sound. Returns null at the end of the tape, or before any other block
+    /// (a turbo loader's), which is left to be played.
     /// </summary>
     public byte[]? TakeBlock()
     {
-        if (AtEnd)
+        while (!AtEnd && _tape.Blocks[CurrentBlock].Kind is TapeBlockKind.Info or TapeBlockKind.Pause or TapeBlockKind.Stop48 or TapeBlockKind.SetLevel)
+        {
+            _cursor.MoveTo(CurrentBlock + 1);
+        }
+
+        if (AtEnd || _tape.Blocks[CurrentBlock].RomData is not { } data)
         {
             return null;
         }
 
-        _phase = Phase.Stopped;
-        return _blocks[_block++];
+        _playing = false;
+        _cursor.MoveTo(CurrentBlock + 1);
+        return data;
     }
 
-    /// <summary>Plays the tape up to <paramref name="time"/>, telling the beeper about each edge.</summary>
+    /// <summary>Plays the tape up to <paramref name="time"/>, telling the beeper about each change of level.</summary>
     public void AdvanceTo(long time, Beeper beeper)
     {
-        while (IsPlaying && _nextEdge <= time)
+        var silentEdges = 0;
+        while (_playing && _nextEdge <= time)
         {
-            var edge = _nextEdge;
-
-            if (_phase == Phase.Pause)
+            if (_stopAfterEdge || AtEnd)
             {
-                _block++;
-                if (AtEnd)
-                {
-                    _phase = Phase.Stopped;
-                }
-                else
-                {
-                    StartBlock(edge);
-                }
-
-                continue;
+                _playing = false;
+                _stopAfterEdge = false;
+                break;
             }
 
-            Level = !Level;
-            beeper.SetTapeLevel(edge, Level);
-            ScheduleNextEdge(edge);
+            var edge = _cursor.Next();
+            var level = edge.Transition switch
+            {
+                TapeTransition.Toggle => !Level,
+                TapeTransition.Low => false,
+                TapeTransition.High => true,
+                _ => Level,
+            };
+
+            if (level != Level)
+            {
+                Level = level;
+                beeper.SetTapeLevel(_nextEdge, level);
+            }
+
+            _stopAfterEdge = (edge.Flags & (TapeEdgeFlags.Stop | TapeEdgeFlags.EndOfTape)) != 0
+                || (Is48K && (edge.Flags & TapeEdgeFlags.Stop48) != 0);
+
+            // Once stopped, EAR no longer reads the tape: the last level is held a moment first,
+            // so that a loader sees the edge that ends the last pulse.
+            _nextEdge += _stopAfterEdge ? Math.Max(edge.Duration, StopHold) : edge.Duration;
+
+            silentEdges = edge.Duration == 0 ? silentEdges + 1 : 0;
+            if (silentEdges > MaxSilentEdges)
+            {
+                _playing = false;
+            }
         }
     }
 
-    /// <summary>Makes the next edge relative to the next frame.</summary>
+    /// <summary>Makes the next edge, and the last read, relative to the next frame.</summary>
     public void EndFrame(int frameTStates)
     {
-        if (IsPlaying)
+        _lastRead -= frameTStates;
+        if (_playing)
         {
             _nextEdge -= frameTStates;
         }
     }
-
-    private void StartBlock(long now)
-    {
-        var block = _blocks[_block];
-        if (block.Length == 0)
-        {
-            _phase = Phase.Pause;
-            _nextEdge = now + PauseTStates;
-            return;
-        }
-
-        // Headers have a flag byte below 0x80 and a longer pilot tone.
-        _phase = Phase.Pilot;
-        _pulsesLeft = block[0] < 0x80 ? HeaderPilotPulses : DataPilotPulses;
-        _nextEdge = now + PilotPulse;
-    }
-
-    /// <summary>Called on each edge, which ends a pulse: schedules the end of the next one.</summary>
-    private void ScheduleNextEdge(long edge)
-    {
-        switch (_phase)
-        {
-            case Phase.Pilot:
-                if (--_pulsesLeft > 0)
-                {
-                    _nextEdge = edge + PilotPulse;
-                }
-                else
-                {
-                    _phase = Phase.FirstSync;
-                    _nextEdge = edge + FirstSyncPulse;
-                }
-
-                break;
-
-            case Phase.FirstSync:
-                _phase = Phase.SecondSync;
-                _nextEdge = edge + SecondSyncPulse;
-                break;
-
-            case Phase.SecondSync:
-                _phase = Phase.Data;
-                _byte = 0;
-                _bitMask = 0x80;
-                _secondHalf = false;
-                _nextEdge = edge + BitPulse();
-                break;
-
-            default:
-                if (!_secondHalf)
-                {
-                    _secondHalf = true;
-                    _nextEdge = edge + BitPulse();
-                    break;
-                }
-
-                _secondHalf = false;
-                _bitMask >>= 1;
-                if (_bitMask == 0)
-                {
-                    _bitMask = 0x80;
-                    _byte++;
-                }
-
-                if (_byte == _blocks[_block].Length)
-                {
-                    _phase = Phase.Pause;
-                    _nextEdge = edge + PauseTStates;
-                }
-                else
-                {
-                    _nextEdge = edge + BitPulse();
-                }
-
-                break;
-        }
-    }
-
-    private int BitPulse() => (_blocks[_block][_byte] & _bitMask) != 0 ? OnePulse : ZeroPulse;
 }

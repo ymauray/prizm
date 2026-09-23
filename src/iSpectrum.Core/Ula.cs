@@ -127,6 +127,11 @@ public sealed class Ula : IIo, IScreenWriteObserver
             return FloatingBus((_cpu?.TStates ?? 0) + IoDataLatchDelay);
         }
 
+        if (_cpu is not null)
+        {
+            Tape.OnPortRead(_cpu.TStates, _cpu.B);
+        }
+
         AdvanceSounds(_cpu?.TStates ?? 0);
         var ear = (Tape.IsPlaying ? Tape.Level : _speakerHigh) ? 0x40 : 0;
         return (byte)(0xA0 | ear | Keyboard.Read((byte)(port >> 8)));

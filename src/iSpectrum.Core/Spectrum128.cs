@@ -24,6 +24,9 @@ public sealed class Spectrum128 : Spectrum
         _memory128 = memory;
         Ay = ay;
         ula.AddSoundSource(ay);
+
+        // As in FUSE, the model decides, even when the 128K runs its 48K BASIC.
+        ula.Tape.Is48K = false;
     }
 
     /// <summary>The sound chip; its output is mixed into <see cref="Spectrum.AudioSamples"/>.</summary>

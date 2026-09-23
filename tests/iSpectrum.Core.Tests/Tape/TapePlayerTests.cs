@@ -102,4 +102,77 @@ public class TapePlayerTests
         Assert.Equal(0xFF, _player.TakeBlock()![0]);
         Assert.Null(_player.TakeBlock());
     }
+
+    [Fact]
+    public void TakeBlock_PassesOverBlocksWithoutSound()
+    {
+        byte[] data = [0xFF, 0x42, 0xBD];
+        _player.Insert(TapeBuilder.Tzx(TapeBuilder.TextBlock("title"), TapeBuilder.PauseBlock(500), TapeBuilder.StandardBlock(data)));
+
+        Assert.Equal(data, _player.TakeBlock());
+        Assert.True(_player.AtEnd);
+    }
+
+    [Fact]
+    public void TakeBlock_LeavesATurboBlockToBePlayed()
+    {
+        _player.Insert(TapeBuilder.Tzx(TapeBuilder.TurboBlock([0xFF, 0x00], 400, 800)));
+
+        Assert.Null(_player.TakeBlock());
+        Assert.Equal(0, _player.CurrentBlock);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void StopIf48KBlock_StopsTheTapeOnA48KOnly(bool is48K)
+    {
+        byte[] stopIf48K = [0x2A, 0, 0, 0, 0];
+        _player.Is48K = is48K;
+        _player.Insert(TapeBuilder.Tzx(stopIf48K, TapeBuilder.StandardBlock([0xFF, 0x00])));
+        _player.Play(0);
+
+        _player.AdvanceTo(10_000, _beeper);
+
+        Assert.Equal(!is48K, _player.IsPlaying);
+        Assert.Equal(1, _player.CurrentBlock);
+    }
+
+    [Fact]
+    public void ATapeThatLoopsWithoutSound_IsStopped()
+    {
+        // A jump back to the text block before it: round and round, without a sound.
+        byte[] jumpBack = [0x23, 0xFF, 0xFF];
+        _player.Insert(TapeBuilder.Tzx(TapeBuilder.TextBlock("again"), jumpBack));
+        _player.Play(0);
+
+        _player.AdvanceTo(0, _beeper);
+
+        Assert.False(_player.IsPlaying);
+    }
+
+    /// <summary>
+    /// Out Run's tape ends with a data block without a pause, then a block that stops the tape:
+    /// the edge that ends its last pulse must come, and last long enough for the loader to see.
+    /// </summary>
+    [Fact]
+    public void ALastPulseWithoutPause_EndsWithAnEdge_BeforeTheTapeStops()
+    {
+        // Pure data: pulses of 500 (0) and 1000 (1), 8 bits used, no pause, one byte 0x00.
+        byte[] pureData = [0x14, 0xF4, 0x01, 0xE8, 0x03, 8, 0, 0, 1, 0, 0, 0x00];
+        _player.Insert(TapeBuilder.Tzx(pureData, TapeBuilder.PauseBlock(0)));
+        _player.Play(0);
+        const long end = 16 * 500;
+
+        _player.AdvanceTo(end - 1, _beeper);
+        var level = _player.Level;
+        _player.AdvanceTo(end, _beeper);
+        Assert.NotEqual(level, _player.Level);
+
+        _player.AdvanceTo(end + 3000, _beeper);
+        Assert.True(_player.IsPlaying);
+
+        _player.AdvanceTo(end + 3500, _beeper);
+        Assert.False(_player.IsPlaying);
+    }
 }

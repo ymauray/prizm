@@ -14,8 +14,11 @@ namespace iSpectrum.Core;
 public abstract class Spectrum
 {
 
-    /// <summary>LD-BYTES, the ROM routine that loads a block from tape.</summary>
-    private const ushort LdBytes = 0x0556;
+    /// <summary>
+    /// LD-SAMPLE, inside LD-EDGE: where the ROM reads the tape signal, while it waits for a
+    /// block as while it loads one.
+    /// </summary>
+    private const ushort LdSample = 0x05ED;
 
     /// <summary>
     /// LD-BREAK, inside LD-BYTES once it has saved its arguments: the expected flag byte in A',
@@ -145,14 +148,23 @@ public abstract class Spectrum
         {
             if (FastLoad)
             {
-                if (Cpu.PC == LdBytesReady && !Tape.AtEnd)
+                if (Cpu.PC == LdBytesReady && !Tape.IsPlaying)
                 {
-                    LoadBlockAtOnce();
+                    if (Tape.TakeBlock() is { } block)
+                    {
+                        LoadBlockAtOnce(block);
+                    }
+                    else
+                    {
+                        // Not a block at the ROM's speed: the ROM reads it in real time.
+                        Tape.Play(Cpu.TStates);
+                    }
                 }
             }
-            else if (Cpu.PC == LdBytes && !Tape.IsPlaying)
+            else if (Cpu.PC == LdSample && !Tape.IsPlaying)
             {
-                // Press "play" when the ROM starts listening to the tape.
+                // Press "play" when the ROM listens to the tape: when it starts loading, and
+                // again after a TZX block has stopped the tape.
                 Tape.Play(Cpu.TStates);
             }
         }
@@ -184,9 +196,8 @@ public abstract class Spectrum
     /// block is intact. A block with the wrong flag is used up and fails, as on a real tape: the
     /// ROM then tries the next one. Technique from FUSE's tape traps.
     /// </summary>
-    private void LoadBlockAtOnce()
+    private void LoadBlockAtOnce(byte[] block)
     {
-        var block = Tape.TakeBlock()!;
         var load = (Cpu.F_ & 0x01) != 0;
         Cpu.H = block.Length > 0 && block[0] == Cpu.A_ ? CopyBlock(block, load) : (byte)0xFF;
         Cpu.PC = LdBytesExit;
