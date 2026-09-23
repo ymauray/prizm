@@ -119,6 +119,64 @@ public class TapeLoadingTests
     }
 
     [Fact]
+    public void Rom_LoadsATzxTape_ThroughItsInformationBlocks()
+    {
+        var hello = TapeBuilder.HelloProgram();
+        var spectrum = TestMachine.Boot();
+        spectrum.Tape.Insert(TapeBuilder.Tzx(
+            TapeBuilder.TextBlock("hello, a test tape"),
+            TapeBuilder.StandardBlock(hello.Blocks[0]),
+            TapeBuilder.StandardBlock(hello.Blocks[1])));
+
+        TypeLoad(spectrum);
+        RunUntilRow(spectrum, "HI ", MaxLoadingFrames);
+
+        Assert.True(FindRow(spectrum, "HI ") > 0);
+    }
+
+    /// <summary>
+    /// A data block at another speed than the ROM's, but one the ROM still reads, stands for a
+    /// turbo loader's: fast loading takes the header at once, then plays the rest in real time.
+    /// </summary>
+    [Fact]
+    public void FastLoad_PlaysInRealTime_WhatTheRomCannotTakeAtOnce()
+    {
+        var hello = TapeBuilder.HelloProgram();
+        var spectrum = TestMachine.Boot();
+        spectrum.FastLoad = true;
+        spectrum.Tape.Insert(TapeBuilder.Tzx(
+            TapeBuilder.StandardBlock(hello.Blocks[0]),
+            TapeBuilder.TurboBlock(hello.Blocks[1], zeroPulse: 800, onePulse: 1600)));
+
+        TypeLoad(spectrum);
+        spectrum.RunFrames(10);
+        Assert.True(FindRow(spectrum, "Program: hello ") >= 0, "The header is not fast-loaded.");
+        Assert.True(spectrum.Tape.IsPlaying, "The turbo block does not play.");
+
+        // Its pause, its pilot and its data take about 2 s.
+        RunUntilRow(spectrum, "HI ", 200);
+        Assert.True(FindRow(spectrum, "HI ") > 0);
+    }
+
+    [Fact]
+    public void StopBlock_StopsTheTape_UntilTheRomLoadsAgain()
+    {
+        var hello = TapeBuilder.HelloProgram();
+        var spectrum = TestMachine.Boot();
+        spectrum.Tape.Insert(TapeBuilder.Tzx(
+            TapeBuilder.StandardBlock(hello.Blocks[0]),
+            TapeBuilder.PauseBlock(0),
+            TapeBuilder.StandardBlock(hello.Blocks[1])));
+
+        TypeLoad(spectrum);
+        RunUntilRow(spectrum, "Program: hello ", MaxLoadingFrames);
+
+        // The ROM goes on to load the data, which starts the tape again.
+        RunUntilRow(spectrum, "HI ", MaxLoadingFrames);
+        Assert.True(FindRow(spectrum, "HI ") > 0);
+    }
+
+    [Fact]
     public void AutoTyper_TypesLoadAfterBoot_WhileTheUserTypesNothing()
     {
         var spectrum = new Spectrum48(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "roms", "48.rom")))
@@ -133,6 +191,14 @@ public class TapeLoadingTests
 
         Assert.False(spectrum.AutoTyper.IsBusy);
         Assert.True(FindRow(spectrum, "HI ") > 0);
+    }
+
+    private static void RunUntilRow(Spectrum48 spectrum, string start, int maxFrames)
+    {
+        for (var frame = 0; frame < maxFrames && FindRow(spectrum, start) < 0; frame++)
+        {
+            spectrum.RunFrame();
+        }
     }
 
     private static int FindRow(Spectrum48 spectrum, string start)
