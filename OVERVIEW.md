@@ -11,9 +11,10 @@ GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
 
 ## 0. État d'avancement
 
-**Jalons 1 à 3 terminés** (tags Git `jalon-1` à `jalon-3`) : le Spectrum 48K démarre la ROM
-d'origine dans une fenêtre, et l'on peut taper et exécuter du BASIC au clavier du Mac. Il n'y a
-encore ni son, ni chargement de programmes.
+**Jalons 1 à 4 terminés** (tags Git `jalon-1` à `jalon-4`) : le Spectrum 48K démarre la ROM
+d'origine dans une fenêtre, on y tape du BASIC au clavier du Mac, et il charge et sauvegarde des
+snapshots ; un vrai jeu de 1983 (*Miner*, de David Hembrow, librement redistribuable) tourne.
+Il n'y a encore ni son, ni chargement de cassettes.
 
 Ce qui existe :
 
@@ -27,10 +28,18 @@ Ce qui existe :
 - `src/iSpectrum.App` : fenêtre Raylib-cs 960×768 (image ×3, sans filtrage), 50 images/s ;
   `KeyboardInput` traduit le clavier du Mac en matrice Spectrum à chaque frame.
 - `SpectrumCharacters` (Core) : quelles touches Spectrum tapent un caractère donné.
+- `src/iSpectrum.Core/Snapshots` : `SnaFormat` (chargement et sauvegarde `.SNA` 48K),
+  `Z80Format` (chargement `.Z80` versions 1 à 3, 48K), `Snapshot` (choix d'après l'extension).
+- App : chargement en argument, par glisser-déposer ou Cmd+O (sélecteur natif via `osascript`,
+  `zenity` sous Linux) ; Cmd+S sauvegarde un `.SNA` dans `~/Documents/iSpectrum`, Cmd+F ouvre
+  ce dossier. Messages dans le titre de la fenêtre (pas encore de texte à l'écran).
 - Tests : suite FUSE (1356 tests), ZEXDOC et ZEXALL (catégorie `Slow`), interruptions,
   adressage écran, attributs, bordure, protection de la ROM, matrice clavier, et deux tests sur
   la vraie ROM qui relisent l'écran en comparant chaque case à la police de la ROM : le message
   de copyright au démarrage, puis `PRINT 2+2` et `PRINT "A+B=C"` tapés au clavier.
+- Snapshots : fichiers fabriqués dans le code (aucun jeu dans le dépôt) — en-têtes écrits à la
+  main d'après la description des formats, cas limites de la compression, et un programme BASIC
+  sauvegardé puis rechargé dans une machine neuve pour chaque format.
 
 Choix de comportement déjà faits (détaillés en commentaire dans le code) :
 
@@ -57,6 +66,12 @@ Choix de comportement déjà faits (détaillés en commentaire dans le code) :
   la disposition du Spectrum). Option est laissée au système (elle tape `@`, `#`…). Touches
   spéciales : voir `README.md`.
 - La RAM démarre à zéro.
+- `.SNA` : PC est sur la pile (chargement = RETN) ; la sauvegarde l'y pousse dans la copie de la
+  RAM sans modifier la machine, et échoue si SP ne laisse pas de place en RAM.
+- `.Z80` : le compteur de T-states des fichiers v3 est ignoré, la frame repart à 0 au chargement
+  (comme pour `.SNA`) ; les snapshots 128K et les autres machines sont refusés avec un message.
+- L'App charge un snapshot dans une machine neuve et ne remplace la machine en cours qu'en cas
+  de succès : un fichier invalide ne laisse jamais une machine à moitié chargée.
 
 Reste en suspens :
 
@@ -70,9 +85,9 @@ Reste en suspens :
 - Pas encore de fenêtre « À propos » : le copyright Amstrad n'est mentionné que dans
   `README.md` et `roms/README.md`.
 
-**Prochaine étape : jalon 4** — chargement des snapshots `.SNA` puis `.Z80` (versions 1 à 3)
-dans `iSpectrum.Core`, avec tests des chargeurs ; ouverture d'un fichier dans l'App (glisser-
-déposer). Les jeux de test personnels vont dans `local/`, jamais dans Git.
+**Prochaine étape : jalon 5** — beeper : bit 4 du port `0xFE` échantillonné selon les T-states,
+buffer audio par frame dans `iSpectrum.Core`, flux audio Raylib dans l'App ; la cadence devrait
+alors se caler sur l'audio plutôt que sur `SetTargetFPS`.
 
 ---
 
@@ -100,13 +115,13 @@ iSpectrum/
 ├── iSpectrum.sln
 ├── src/
 │   ├── iSpectrum.Z80/        # CPU Z80 pur, sans dépendance (IMemory, IIo)
-│   ├── iSpectrum.Core/       # Machine : mémoire, ULA, clavier, boucle de frame (son, formats à venir)
-│   └── iSpectrum.App/        # Front-end : fenêtre, rendu, clavier (Raylib-cs) ; audio à venir
+│   ├── iSpectrum.Core/       # Machine : mémoire, ULA, clavier, frame, snapshots (son, cassettes à venir)
+│   └── iSpectrum.App/        # Front-end : fenêtre, rendu, clavier, fichiers (Raylib-cs) ; audio à venir
 ├── tests/
 │   ├── iSpectrum.Z80.Tests/
 │   │   ├── Fuse/             # Suite FUSE + parseur et runner (provenance dans README.md)
 │   │   └── Zex/              # ZEXDOC/ZEXALL + harnais CP/M (provenance dans README.md)
-│   └── iSpectrum.Core.Tests/ # Écran, attributs, mémoire, clavier, ROM (SNA/Z80/TAP à venir)
+│   └── iSpectrum.Core.Tests/ # Écran, attributs, mémoire, clavier, ROM, SNA/Z80 (TAP à venir)
 ├── local/                    # Ignoré par Git : fichiers de test personnels (jeux…)
 ├── README.md
 └── roms/
@@ -259,7 +274,7 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 | 1 | CPU Z80 + harnais de tests | Tests FUSE et ZEXDOC/ZEXALL au vert — **terminé** (`jalon-1`) |
 | 2 | Mémoire + ROM + affichage écran | Message « © 1982 Sinclair Research Ltd » à l'écran — **terminé** (`jalon-2`) |
 | 3 | Clavier | On peut taper et exécuter du BASIC — **terminé** (`jalon-3`) |
-| 4 | Chargement `.SNA` / `.Z80` | Les premiers jeux tournent |
+| 4 | Chargement `.SNA` / `.Z80` | Les premiers jeux tournent — **terminé** (`jalon-4`) |
 | 5 | Beeper | Le son fonctionne |
 | 6 | `.TAP` (flash loading) | Chargement des cassettes courantes |
 | 7 | Contention mémoire + rendu ligne par ligne | Démos et effets de bordure corrects |
