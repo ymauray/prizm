@@ -1,0 +1,29 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 The iSpectrum contributors
+
+namespace iSpectrum.Core.Snapshots;
+
+/// <summary>Picks the snapshot format from the file extension.</summary>
+public static class Snapshot
+{
+    /// <summary>Whether the file name has a snapshot extension this emulator can load.</summary>
+    public static bool IsSupported(string fileName) => Extension(fileName) is ".sna" or ".z80";
+
+    /// <summary>Loads a snapshot into the machine; throws if the data is invalid or unsupported.</summary>
+    public static void Load(Spectrum48 spectrum, string fileName, ReadOnlySpan<byte> data)
+    {
+        switch (Extension(fileName))
+        {
+            case ".sna":
+                SnaFormat.Load(spectrum, data);
+                break;
+            case ".z80":
+                Z80Format.Load(spectrum, data);
+                break;
+            default:
+                throw new NotSupportedException($"Unknown snapshot type: {Path.GetFileName(fileName)}");
+        }
+    }
+
+    private static string Extension(string fileName) => Path.GetExtension(fileName).ToLowerInvariant();
+}

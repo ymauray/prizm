@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026 The iSpectrum contributors
 
-using System.Text;
-
 namespace iSpectrum.Core.Tests;
 
 /// <summary>Boots the real 48K ROM and reads back what it prints.</summary>
@@ -12,7 +10,7 @@ public class BootTests
     public void Rom_BootsToTheCopyrightMessage()
     {
         // The ROM tests the RAM first; the message appears after about 85 frames (1.7 s).
-        var spectrum = Boot();
+        var spectrum = TestMachine.Boot();
 
         Assert.Equal("© 1982 Sinclair Research Ltd", ScreenText.ReadRow(spectrum.Memory.Contents, 23).TrimEnd());
         Assert.Equal(7, spectrum.Ula.Border);
@@ -21,14 +19,14 @@ public class BootTests
     [Fact]
     public void Rom_RunsABasicCommandTypedOnTheKeyboard()
     {
-        var spectrum = Boot();
+        var spectrum = TestMachine.Boot();
 
         // In the 48K ROM, P at the start of a line is the PRINT keyword; Symbol Shift + K is "+".
-        Type(spectrum, SpectrumKey.P);
-        Type(spectrum, SpectrumKey.D2);
-        Type(spectrum, SpectrumKey.SymbolShift, SpectrumKey.K);
-        Type(spectrum, SpectrumKey.D2);
-        Type(spectrum, SpectrumKey.Enter);
+        spectrum.Type(SpectrumKey.P);
+        spectrum.Type(SpectrumKey.D2);
+        spectrum.Type(SpectrumKey.SymbolShift, SpectrumKey.K);
+        spectrum.Type(SpectrumKey.D2);
+        spectrum.Type(SpectrumKey.Enter);
 
         Assert.StartsWith("4 ", ScreenText.ReadRow(spectrum.Memory.Contents, 0));
         Assert.StartsWith("0 OK, 0:1", ScreenText.ReadRow(spectrum.Memory.Contents, 23));
@@ -37,96 +35,12 @@ public class BootTests
     [Fact]
     public void Rom_PrintsSymbolsTypedAsCharacters()
     {
-        var spectrum = Boot();
+        var spectrum = TestMachine.Boot();
 
         // "p" at the start of a line is PRINT; the quotes, + and = go through Symbol Shift.
-        TypeText(spectrum, "p\"A+B=C\"");
-        Type(spectrum, SpectrumKey.Enter);
+        spectrum.TypeText("p\"A+B=C\"");
+        spectrum.Type(SpectrumKey.Enter);
 
         Assert.StartsWith("A+B=C ", ScreenText.ReadRow(spectrum.Memory.Contents, 0));
-    }
-
-    private static void TypeText(Spectrum48 spectrum, string text)
-    {
-        foreach (var c in text)
-        {
-            Assert.True(SpectrumCharacters.TryGetKeys(c, out var key, out var shift), $"Cannot type '{c}'");
-            if (shift is { } shiftKey)
-            {
-                Type(spectrum, shiftKey, key);
-            }
-            else
-            {
-                Type(spectrum, key);
-            }
-        }
-    }
-
-    private static Spectrum48 Boot()
-    {
-        var spectrum = new Spectrum48(File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "roms", "48.rom")));
-        RunFrames(spectrum, 150);
-        return spectrum;
-    }
-
-    /// <summary>
-    /// Holds the keys for 5 frames, then releases them for 5 frames: long enough for the ROM,
-    /// which scans the keyboard once per frame, and short of its auto-repeat delay.
-    /// </summary>
-    private static void Type(Spectrum48 spectrum, params SpectrumKey[] keys)
-    {
-        foreach (var key in keys)
-        {
-            spectrum.Keyboard.SetKey(key, true);
-        }
-
-        RunFrames(spectrum, 5);
-        spectrum.Keyboard.ReleaseAll();
-        RunFrames(spectrum, 5);
-    }
-
-    private static void RunFrames(Spectrum48 spectrum, int count)
-    {
-        for (var frame = 0; frame < count; frame++)
-        {
-            spectrum.RunFrame();
-        }
-    }
-}
-
-/// <summary>Reads text off the screen by matching each 8x8 cell against the ROM font.</summary>
-internal static class ScreenText
-{
-    /// <summary>The ROM character set: 96 characters from space (0x20) to (C) (0x7F), 8 bytes each.</summary>
-    private const int FontAddress = 0x3D00;
-
-    public static string ReadRow(ReadOnlySpan<byte> memory, int row)
-    {
-        var text = new StringBuilder(32);
-        for (var column = 0; column < 32; column++)
-        {
-            text.Append(ReadCell(memory, column, row));
-        }
-
-        return text.ToString();
-    }
-
-    private static char ReadCell(ReadOnlySpan<byte> memory, int column, int row)
-    {
-        Span<byte> cell = stackalloc byte[8];
-        for (var line = 0; line < 8; line++)
-        {
-            cell[line] = memory[ScreenLayout.PixelAddress(column * 8, (row * 8) + line)];
-        }
-
-        for (var code = 0x20; code <= 0x7F; code++)
-        {
-            if (cell.SequenceEqual(memory.Slice(FontAddress + ((code - 0x20) * 8), 8)))
-            {
-                return code == 0x7F ? '©' : (char)code;
-            }
-        }
-
-        return '?';
     }
 }

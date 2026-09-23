@@ -26,8 +26,14 @@ public sealed class Ula : IIo
     /// <summary>The key matrix read through port 0xFE.</summary>
     public Keyboard Keyboard { get; } = new();
 
-    /// <summary>Border colour, 0-7, set by bits 0-2 of a write to port 0xFE.</summary>
-    public int Border { get; private set; }
+    private int _border;
+
+    /// <summary>Border colour, 0-7: bits 0-2 of a write to port 0xFE, or restored from a snapshot.</summary>
+    public int Border
+    {
+        get => _border;
+        set => _border = value & 0x07;
+    }
 
     /// <summary>FrameWidth x FrameHeight pixels, row by row, in <see cref="Palette"/> format.</summary>
     public ReadOnlySpan<uint> FrameBuffer => _frameBuffer;
@@ -44,7 +50,7 @@ public sealed class Ula : IIo
     {
         if ((port & 1) == 0)
         {
-            Border = value & 0x07;
+            Border = value;
         }
     }
 

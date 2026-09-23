@@ -28,6 +28,17 @@ public sealed class Memory48K : IMemory
     /// <summary>The whole 64 KB address space, for the ULA and for tests.</summary>
     public ReadOnlySpan<byte> Contents => _memory;
 
+    /// <summary>Copies <paramref name="data"/> into RAM at <paramref name="address"/> (snapshot loading).</summary>
+    public void LoadRam(ushort address, ReadOnlySpan<byte> data)
+    {
+        if (address < RomSize || address + data.Length > _memory.Length)
+        {
+            throw new ArgumentOutOfRangeException(nameof(address), "The data must fit in RAM (0x4000-0xFFFF).");
+        }
+
+        data.CopyTo(_memory.AsSpan(address));
+    }
+
     public byte Read(ushort address) => _memory[address];
 
     public void Write(ushort address, byte value)
