@@ -19,6 +19,7 @@
     <None Include="..\..\roms\*.rom" LinkBase="roms" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Z80Test\*.tap" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Debugging\*.sym" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="Tape\Libspectrum\*.tzx" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
