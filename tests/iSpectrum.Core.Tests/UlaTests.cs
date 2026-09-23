@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 // Copyright (C) 2026 The iSpectrum contributors
 
+using iSpectrum.Z80;
+
 namespace iSpectrum.Core.Tests;
 
 public class UlaTests
@@ -61,6 +63,36 @@ public class UlaTests
     }
 
     [Fact]
+    public void BorderChange_ShowsFromTheBeamPositionAtWhichItHappened()
+    {
+        var cpu = new Z80Cpu(new FlatRam(), _ula);
+        _ula.Connect(cpu);
+        _ula.Border = 1;
+
+        // Blue until the beam reaches the left border of screen line 100 (32 pixels, 16 T-states
+        // before its first screen pixel), then red.
+        cpu.TStates = Ula.FirstPixelTState + (100 * Ula.LineTStates) - 16;
+        _ula.Out(0x00FE, 0x02);
+        _ula.EndFrame(_memory);
+
+        var row = (100 + Ula.BorderTop) * Ula.FrameWidth;
+        Assert.Equal(Color(1), _ula.FrameBuffer[row - 1]);           // right border of line 99
+        Assert.Equal(Color(2), _ula.FrameBuffer[row]);               // left border of line 100
+        Assert.Equal(Color(1), _ula.FrameBuffer[0]);                 // top border
+        Assert.Equal(Color(2), _ula.FrameBuffer[^1]);                // bottom border
+    }
+
+    [Fact]
+    public void BorderChanges_StartOverAtTheNextFrame()
+    {
+        _ula.Out(0x00FE, 0x04);
+        _ula.EndFrame(_memory);
+        _ula.EndFrame(_memory);
+
+        Assert.Equal(Color(4), _ula.FrameBuffer[0]);
+    }
+
+    [Fact]
     public void Border_TakesBits0To2OfAnEvenPortWrite()
     {
         _ula.Out(0x00FE, 0xF3); // only bits 0-2 count: 3 = magenta
@@ -71,5 +103,12 @@ public class UlaTests
         Assert.Equal(3, _ula.Border);
         Assert.Equal(Color(3), _ula.FrameBuffer[0]);
         Assert.Equal(Color(3), _ula.FrameBuffer[^1]);
+    }
+
+    private sealed class FlatRam : IMemory
+    {
+        public byte Read(ushort address) => 0;
+
+        public void Write(ushort address, byte value) { }
     }
 }

@@ -6,10 +6,14 @@ using iSpectrum.Z80;
 namespace iSpectrum.Core;
 
 /// <summary>
-/// The ULA: port 0xFE (keyboard, border and speaker) and
-/// the video output. The whole frame is rendered at once at the end of each frame; line-by-line
-/// rendering, needed for border effects, comes with contention (milestone 7).
+/// The ULA: port 0xFE (keyboard, border and speaker) and the video output.
 /// </summary>
+/// <remarks>
+/// The frame is rendered at its end. The screen area is drawn from the memory as it is then; the
+/// border follows the beam: each border change is stamped with the CPU's T-state count, and each
+/// border pixel takes the colour in effect when the beam drew it, which shows the stripes of tape
+/// loading. Drawing the screen area line by line too comes with contention (milestone 7).
+/// </remarks>
 public sealed class Ula : IIo
 {
     public const int BorderLeft = 32;
@@ -17,10 +21,24 @@ public sealed class Ula : IIo
     public const int FrameWidth = ScreenLayout.Width + (2 * BorderLeft);
     public const int FrameHeight = ScreenLayout.Height + (2 * BorderTop);
 
+    /// <summary>T-state at which the beam draws the first pixel of the screen area (48K).</summary>
+    public const int FirstPixelTState = 14336;
+
+    /// <summary>T-states per scan line; the beam draws 2 pixels per T-state.</summary>
+    public const int LineTStates = 224;
+
     /// <summary>FLASH attributes swap ink and paper every 16 frames.</summary>
     private const int FlashPeriod = 16;
 
+    /// <summary>Changes kept per frame; tape loading makes about 80, border effects a few hundred.</summary>
+    private const int MaxBorderChanges = 4096;
+
     private readonly uint[] _frameBuffer = new uint[FrameWidth * FrameHeight];
+    private readonly long[] _borderChangeTimes = new long[MaxBorderChanges];
+    private readonly byte[] _borderChangeColors = new byte[MaxBorderChanges];
+    private int _borderChangeCount;
+    private int _frameStartBorder;
+    private int _border;
     private int _frameCount;
 
     private Z80Cpu? _cpu;
@@ -31,13 +49,19 @@ public sealed class Ula : IIo
     /// <summary>The speaker, driven by bit 4 of port 0xFE.</summary>
     public Beeper Beeper { get; } = new();
 
-    private int _border;
-
-    /// <summary>Border colour, 0-7: bits 0-2 of a write to port 0xFE, or restored from a snapshot.</summary>
+    /// <summary>
+    /// Border colour, 0-7, as last written to port 0xFE. Setting it directly (snapshot loading)
+    /// colours the whole border of the current frame.
+    /// </summary>
     public int Border
     {
         get => _border;
-        set => _border = value & 0x07;
+        set
+        {
+            _border = value & 0x07;
+            _frameStartBorder = _border;
+            _borderChangeCount = 0;
+        }
     }
 
     /// <summary>FrameWidth x FrameHeight pixels, row by row, in <see cref="Palette"/> format.</summary>
@@ -51,7 +75,7 @@ public sealed class Ula : IIo
     public byte In(ushort port) =>
         (port & 1) == 0 ? (byte)(0xE0 | Keyboard.Read((byte)(port >> 8))) : (byte)0xFF;
 
-    /// <summary>Gives the ULA the CPU whose T-state count stamps the speaker changes.</summary>
+    /// <summary>Gives the ULA the CPU whose T-state count stamps border and speaker changes.</summary>
     public void Connect(Z80Cpu cpu) => _cpu = cpu;
 
     /// <summary>
@@ -60,38 +84,60 @@ public sealed class Ula : IIo
     /// </summary>
     public void Out(ushort port, byte value)
     {
-        if ((port & 1) == 0)
+        if ((port & 1) != 0)
         {
-            Border = value;
-            Beeper.SetLevel(_cpu?.TStates ?? 0, (value & 0x10) != 0);
+            return;
         }
+
+        var time = _cpu?.TStates ?? 0;
+        var color = value & 0x07;
+
+        if (color != _border)
+        {
+            // Past the limit, later changes of this frame are drawn as they were not there.
+            if (_borderChangeCount < MaxBorderChanges)
+            {
+                _borderChangeTimes[_borderChangeCount] = time;
+                _borderChangeColors[_borderChangeCount] = (byte)color;
+                _borderChangeCount++;
+            }
+
+            _border = color;
+        }
+
+        Beeper.SetLevel(time, (value & 0x10) != 0);
     }
 
-    /// <summary>Renders the frame from the current memory, then advances the FLASH counter.</summary>
+    /// <summary>Renders the frame, then starts the next one: FLASH counter, border changes.</summary>
     public void EndFrame(ReadOnlySpan<byte> memory)
     {
         Render(memory);
         _frameCount++;
+        _frameStartBorder = _border;
+        _borderChangeCount = 0;
     }
 
     private void Render(ReadOnlySpan<byte> memory)
     {
-        var border = Palette.Colors[Border];
         var flashInverted = (_frameCount / FlashPeriod % 2) == 1;
+
+        // Border pixels are visited in beam order, so the changes are walked once, in order.
+        var change = 0;
+        var border = Palette.Colors[_frameStartBorder];
 
         for (var row = 0; row < FrameHeight; row++)
         {
             var line = _frameBuffer.AsSpan(row * FrameWidth, FrameWidth);
             var y = row - BorderTop;
+            var lineStart = FirstPixelTState + ((long)y * LineTStates);
 
             if (y is < 0 or >= ScreenLayout.Height)
             {
-                line.Fill(border);
+                PaintBorder(line, 0, FrameWidth, lineStart, ref change, ref border);
                 continue;
             }
 
-            line[..BorderLeft].Fill(border);
-            line[(BorderLeft + ScreenLayout.Width)..].Fill(border);
+            PaintBorder(line, 0, BorderLeft, lineStart, ref change, ref border);
 
             for (var x = 0; x < ScreenLayout.Width; x += 8)
             {
@@ -112,6 +158,28 @@ public sealed class Ula : IIo
                     cell[bit] = (pixels & (0x80 >> bit)) != 0 ? ink : paper;
                 }
             }
+
+            PaintBorder(line, BorderLeft + ScreenLayout.Width, BorderLeft, lineStart, ref change, ref border);
+        }
+    }
+
+    /// <summary>
+    /// Paints <paramref name="count"/> border pixels from <paramref name="first"/>, each with the
+    /// colour in effect when the beam reached it. <paramref name="lineStart"/> is the T-state of
+    /// the line's first screen-area pixel; the left border comes before it.
+    /// </summary>
+    private void PaintBorder(Span<uint> line, int first, int count, long lineStart, ref int change, ref uint color)
+    {
+        for (var x = first; x < first + count; x++)
+        {
+            var time = lineStart + ((x - BorderLeft) >> 1);
+            while (change < _borderChangeCount && _borderChangeTimes[change] <= time)
+            {
+                color = Palette.Colors[_borderChangeColors[change]];
+                change++;
+            }
+
+            line[x] = color;
         }
     }
 }
