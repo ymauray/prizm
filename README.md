@@ -30,8 +30,21 @@ quelle que soit sa disposition, et l'émulateur appuie sur les touches Spectrum 
 | Tab | mode étendu (Caps Shift + Symbol Shift) |
 | F1 … F9 | Caps Shift + 1 … 9 (F1 EDIT, F2 CAPS LOCK, F9 GRAPHICS) |
 
-Les caractères du mode étendu (`[ ] { } ~ | \ ©`) se tapent comme sur le Spectrum : Tab, puis
-Ctrl + la touche. Pour quitter, fermez la fenêtre.
+Sur Mac, les touches F1 à F9 demandent Fn, sauf si elles sont réglées comme touches de fonction
+standard dans les réglages du clavier. Les caractères du mode étendu (`[ ] { } ~ | \ ©`) se
+tapent comme sur le Spectrum : Tab, puis Ctrl + la touche. Pour quitter, fermez la fenêtre.
+
+## Snapshots
+
+L'émulateur charge les snapshots `.SNA` et `.Z80` (48K) :
+
+- glisser-déposer du fichier sur la fenêtre ;
+- **Cmd+O** : sélecteur de fichier (macOS ; `zenity` sous Linux) ;
+- en argument : `dotnet run --project src/iSpectrum.App -- jeu.z80`.
+
+**Cmd+S** sauvegarde l'état de la machine en `.SNA` dans `~/Documents/iSpectrum/`, et
+**Cmd+F** ouvre ce dossier dans le Finder. Les jeux ne doivent jamais être ajoutés au dépôt :
+rangez vos fichiers personnels dans `local/`, ignoré par Git.
 
 ## Tester
 
