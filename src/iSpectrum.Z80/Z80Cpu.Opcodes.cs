@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 The iSpectrum contributors
+
 namespace iSpectrum.Z80;
 
 // Decoding follows "Decoding Z80 Opcodes" (Cristian Dinu): an opcode splits into

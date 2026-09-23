@@ -31,4 +31,11 @@ provenance est décrite dans le `README.md` de leurs dossiers respectifs.
 
 ## Licence
 
-À définir.
+Copyright © 2026 les contributeurs d'iSpectrum.
+
+iSpectrum est un logiciel libre, distribué sous licence **GNU GPL version 2 ou ultérieure**
+(`GPL-2.0-or-later`) : vous pouvez le redistribuer et le modifier selon les termes de la GPL,
+version 2 ou (à votre choix) toute version ultérieure. Il est fourni sans aucune garantie.
+Texte complet dans [`LICENSE`](LICENSE).
+
+La ROM (`roms/`) n'est pas couverte par cette licence (voir plus haut).

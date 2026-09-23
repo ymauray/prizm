@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 The iSpectrum contributors
+
 namespace iSpectrum.Core;
 
 /// <summary>Where the ULA finds each pixel and attribute of the 256x192 display.</summary>

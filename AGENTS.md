@@ -7,7 +7,7 @@ machine et plan par jalons.
 ## Projet
 
 - Émulateur **ZX Spectrum** (48K d'abord, puis 128K) en **C#**.
-- Projet personnel / open source.
+- Projet personnel / open source, sous licence **GPL-2.0-or-later** (`LICENSE`), sauf la ROM.
 - **Cible prioritaire : macOS Apple Silicon (`osx-arm64`)**. Linux et Windows sont un bonus :
   ne pas les casser volontairement, mais ne pas bloquer dessus.
 
@@ -30,6 +30,12 @@ machine et plan par jalons.
 ## Conventions de code
 
 - Code, identifiants et commentaires **en anglais** ; documentation (`*.md`) en **français**.
+- Chaque fichier `.cs` commence par l'en-tête de licence :
+  `// SPDX-License-Identifier: GPL-2.0-or-later` puis
+  `// Copyright (C) 2026 The iSpectrum contributors`.
+- N'ajouter une dépendance que si sa licence est compatible avec la GPL v2 (MIT, BSD, zlib…).
+  Apache 2.0 n'est compatible qu'avec la GPL v3 : réservé aux outils qui ne sont pas distribués
+  avec le programme (xUnit, par exemple).
 - `Nullable` activé, `TreatWarningsAsErrors` activé, style C# standard (.editorconfig si ajouté).
 - **Boucle chaude (CPU, ULA, rendu) : zéro allocation** par instruction ou par frame.
   Mémoire en `byte[]`, `Span<T>` pour les buffers, pas de LINQ, pas de boxing, pas de `events`.

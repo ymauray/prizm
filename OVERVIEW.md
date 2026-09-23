@@ -1,6 +1,7 @@
 # iSpectrum — Émulateur ZX Spectrum en C#
 
-Projet personnel / open source d'émulateur ZX Spectrum écrit en C# (.NET).
+Projet personnel / open source d'émulateur ZX Spectrum écrit en C# (.NET), sous licence
+GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
 
 - **Plateforme cible prioritaire** : macOS (Apple Silicon, `osx-arm64`)
 - **Plateformes secondaires** : Linux et Windows, si ça fonctionne « gratuitement » grâce à .NET et aux bibliothèques choisies
@@ -53,7 +54,6 @@ Reste en suspens :
 - Cadence réglée par `SetTargetFPS(50)` ; elle devra se caler sur l'audio au jalon 5.
 - Pas encore de fenêtre « À propos » : le copyright Amstrad n'est mentionné que dans
   `README.md` et `roms/README.md`.
-- Licence du projet non choisie. Les fichiers de test FUSE et ZEX sont sous GPL v2+.
 
 **Prochaine étape : jalon 3** — clavier : matrice 8 demi-rangées × 5 touches lue sur le port
 `0xFE` (octet haut de l'adresse), mapping du clavier Mac dans l'App, tests de la matrice.
@@ -78,6 +78,7 @@ Reste en suspens :
 ```
 iSpectrum/
 ├── AGENTS.md                 # Consignes pour les agents de code (CLAUDE.md y renvoie)
+├── LICENSE                   # GNU GPL v2 (le projet est GPL-2.0-or-later)
 ├── OVERVIEW.md
 ├── Directory.Build.props     # net10.0, Nullable, TreatWarningsAsErrors pour tous les projets
 ├── iSpectrum.sln

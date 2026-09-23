@@ -1,3 +1,6 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+// Copyright (C) 2026 The iSpectrum contributors
+
 namespace iSpectrum.Z80;
 
 // ED prefix: x = 1 holds the miscellaneous instructions, x = 2 with y >= 4 and z <= 3 the block
