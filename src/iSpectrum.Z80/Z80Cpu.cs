@@ -90,9 +90,10 @@ public sealed partial class Z80Cpu
 
         IFF1 = IFF2 = false;
 
-        // The acknowledge is an M1 cycle with 2 extra wait states: R advances, 7 T-states.
+        // The acknowledge is an M1 cycle with 2 extra wait states: R advances, 7 T-states,
+        // without contention (as in FUSE).
         IncrementR();
-        Internal(7);
+        TStates += 7;
         Push(PC);
 
         if (IM == 2)
@@ -111,14 +112,17 @@ public sealed partial class Z80Cpu
     }
 
     // Bus access. Each helper adds the T-states of its machine cycle, so an instruction's
-    // total is the sum of its cycles plus the explicit internal cycles (Internal).
+    // total is the sum of its cycles plus its internal cycles. Every cycle that puts an address
+    // on the bus first gives the machine a chance to stall the CPU (contention); the addresses
+    // and the order of these points follow FUSE, whose tests check them one by one.
 
     /// <summary>Opcode fetch (M1): 4 T-states, increments the low 7 bits of R.</summary>
     private byte FetchOpcode()
     {
+        Contend(PC);
+        TStates += 4;
         var opcode = _memory.Read(PC++);
         IncrementR();
-        TStates += 4;
         return opcode;
     }
 
@@ -127,12 +131,14 @@ public sealed partial class Z80Cpu
 
     private byte ReadByte(ushort address)
     {
+        Contend(address);
         TStates += 3;
         return _memory.Read(address);
     }
 
     private void WriteByte(ushort address, byte value)
     {
+        Contend(address);
         TStates += 3;
         _memory.Write(address, value);
     }
@@ -147,18 +153,76 @@ public sealed partial class Z80Cpu
 
     private byte ReadPort(ushort port)
     {
-        TStates += 4;
-        return _io.In(port);
+        StartIoCycle(port);
+        var value = _io.In(port);
+        EndIoCycle(port);
+        return value;
     }
 
     private void WritePort(ushort port, byte value)
     {
-        TStates += 4;
+        StartIoCycle(port);
         _io.Out(port, value);
+        EndIoCycle(port);
     }
 
-    /// <summary>Internal cycles where the bus is idle.</summary>
-    private void Internal(int tStates) => TStates += tStates;
+    // An I/O cycle lasts 4 T-states; the device is read or written after the first. Where the
+    // machine may stall it depends on the port (ZX Spectrum pattern, as in FUSE):
+    //   high byte not contended, even port (ULA): 1, then contention point + 3
+    //   high byte not contended, odd port:        1, then 3
+    //   high byte contended, even port:           contention point + 1, then contention point + 3
+    //   high byte contended, odd port:            contention point + 1, then 3 x (contention point + 1)
+
+    private void StartIoCycle(ushort port)
+    {
+        if (_memory.IsContended(port))
+        {
+            ContendPort(port);
+        }
+
+        TStates += 1;
+    }
+
+    private void EndIoCycle(ushort port)
+    {
+        if ((port & 1) == 0)
+        {
+            ContendPort(port);
+            TStates += 3;
+        }
+        else if (_memory.IsContended(port))
+        {
+            for (var i = 0; i < 3; i++)
+            {
+                ContendPort(port);
+                TStates += 1;
+            }
+        }
+        else
+        {
+            TStates += 3;
+        }
+    }
+
+    private void Contend(ushort address) => TStates += _memory.ContentionDelay(address, TStates);
+
+    private void ContendPort(ushort port) => TStates += _io.ContentionDelay(port, TStates);
+
+    /// <summary>
+    /// Internal cycles, 1 T-state each, during which the Z80 keeps <paramref name="address"/> on
+    /// the bus, so each can be stalled like a memory access.
+    /// </summary>
+    private void Internal(ushort address, int count)
+    {
+        for (var i = 0; i < count; i++)
+        {
+            Contend(address);
+            TStates += 1;
+        }
+    }
+
+    /// <summary>I and R, which the Z80 puts on the address bus during most internal cycles.</summary>
+    private ushort IR => (ushort)((I << 8) | R);
 
     private void Push(ushort value)
     {

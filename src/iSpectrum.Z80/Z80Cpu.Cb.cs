@@ -29,7 +29,7 @@ public sealed partial class Z80Cpu
         }
 
         var memory = ReadByte(HL);
-        Internal(1);
+        Internal(HL, 1);
 
         switch (x)
         {
@@ -49,13 +49,13 @@ public sealed partial class Z80Cpu
     {
         var address = IndexedAddress(ReadOperand());
         var opcode = ReadOperand();
-        Internal(2);
+        Internal((ushort)(PC - 1), 2);
         var x = opcode >> 6;
         var y = (opcode >> 3) & 7;
         var z = opcode & 7;
 
         var value = ReadByte(address);
-        Internal(1);
+        Internal(address, 1);
 
         if (x == 1)
         {

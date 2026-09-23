@@ -57,7 +57,7 @@ public sealed partial class Z80Cpu
                 break;
 
             case 2:
-                Internal(7);
+                Internal(IR, 7);
                 HL = q == 0 ? Sbc16(HL, GetRegisterPair(p)) : Adc16(HL, GetRegisterPair(p));
                 break;
 
@@ -112,19 +112,19 @@ public sealed partial class Z80Cpu
         switch (y)
         {
             case 0:
-                Internal(1);
+                Internal(IR, 1);
                 I = A;
                 break;
 
             case 1:
-                Internal(1);
+                Internal(IR, 1);
                 R = A;
                 break;
 
             case 2:
             case 3:
                 // P/V reflects IFF2.
-                Internal(1);
+                Internal(IR, 1);
                 A = y == 2 ? I : R;
                 F = (byte)((F & FlagC) | Sz53[A] | (IFF2 ? FlagPV : 0));
                 break;
@@ -133,7 +133,7 @@ public sealed partial class Z80Cpu
             case 5:
             {
                 var value = ReadByte(HL);
-                Internal(4);
+                Internal(HL, 4);
                 if (y == 4)
                 {
                     WriteByte(HL, (byte)((A << 4) | (value >> 4)));
@@ -174,7 +174,7 @@ public sealed partial class Z80Cpu
     {
         var value = ReadByte(HL);
         WriteByte(DE, value);
-        Internal(2);
+        Internal(DE, 2);
         BC--;
         DE = (ushort)(DE + step);
         HL = (ushort)(HL + step);
@@ -188,14 +188,15 @@ public sealed partial class Z80Cpu
 
         if (repeat && BC != 0)
         {
-            RepeatBlock();
+            // The repeat's internal cycles keep the address just written on the bus.
+            RepeatBlock((ushort)(DE - step));
         }
     }
 
     private void BlockCompare(int step, bool repeat)
     {
         var value = ReadByte(HL);
-        Internal(5);
+        Internal(HL, 5);
         var result = (byte)(A - value);
         var halfCarry = (A ^ value ^ result) & FlagH;
         BC--;
@@ -215,13 +216,14 @@ public sealed partial class Z80Cpu
 
         if (repeat && BC != 0 && result != 0)
         {
-            RepeatBlock();
+            // The repeat's internal cycles keep the address just read on the bus.
+            RepeatBlock((ushort)(HL - step));
         }
     }
 
     private void BlockIn(int step, bool repeat)
     {
-        Internal(1);
+        Internal(IR, 1);
         var value = ReadPort(BC);
         WriteByte(HL, value);
         WZ = (ushort)(BC + step);
@@ -233,14 +235,14 @@ public sealed partial class Z80Cpu
 
         if (repeat && B != 0)
         {
-            Internal(5);
+            Internal((ushort)(HL - step), 5);
             PC -= 2;
         }
     }
 
     private void BlockOut(int step, bool repeat)
     {
-        Internal(1);
+        Internal(IR, 1);
         var value = ReadByte(HL);
         B--;
         WZ = (ushort)(BC + step);
@@ -253,7 +255,7 @@ public sealed partial class Z80Cpu
 
         if (repeat && B != 0)
         {
-            Internal(5);
+            Internal(BC, 5);
             PC -= 2;
         }
     }
@@ -271,9 +273,9 @@ public sealed partial class Z80Cpu
             | (Sz53P[(sum & 7) ^ B] & FlagPV));
     }
 
-    private void RepeatBlock()
+    private void RepeatBlock(ushort address)
     {
-        Internal(5);
+        Internal(address, 5);
         PC -= 2;
         WZ = (ushort)(PC + 1);
     }

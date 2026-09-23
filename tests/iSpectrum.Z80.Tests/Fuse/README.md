@@ -8,6 +8,8 @@ dossier, qui décrit le format des deux fichiers.
 Ces fichiers sont distribués sous licence **GNU GPL version 2 ou ultérieure**, comme FUSE.
 Ils ne sont pas modifiés.
 
-Le runner (`FuseTests.cs`) compare les registres, le compte de T-states final et la mémoire.
-Les événements de bus (`MR`, `MW`, `MC`, `PR`, `PW`, `PC`) sont lus mais pas encore comparés :
-il faudra pour cela que le CPU horodate chaque accès, ce qui viendra avec la contention (jalon 7).
+Le runner (`FuseTests.cs`) compare les registres, le compte de T-states final, la mémoire et
+tous les événements de bus, dans l'ordre et à leur T-state : lectures et écritures mémoire
+(`MR`, `MW`), accès aux ports (`PR`, `PW`) et points de contention (`MC` pour la mémoire et les
+cycles internes, `PC` pour les entrées-sorties). Comme le harnais de FUSE, les doublures notent
+les points de contention sans ajouter de délai, et tiennent `0x4000`-`0x7FFF` pour contendu.

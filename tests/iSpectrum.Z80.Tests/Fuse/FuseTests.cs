@@ -29,13 +29,16 @@ public class FuseTests
         var input = Suite.Value.Inputs[name];
         var expected = Suite.Value.Expected[name];
 
-        var memory = new FuseMemory();
+        var events = new List<FuseEvent>();
+        var memory = new FuseMemory(events);
         foreach (var block in input.Memory)
         {
             memory.Load(block);
         }
 
-        var cpu = new Z80Cpu(memory, new FuseIo());
+        var io = new FuseIo(events);
+        var cpu = new Z80Cpu(memory, io);
+        memory.Clock = io.Clock = cpu;
         SetState(cpu, input.State);
 
         // The last instruction is allowed to finish past the requested T-state count.
@@ -45,6 +48,7 @@ public class FuseTests
         }
 
         Assert.Equal(expected.State, GetState(cpu));
+        AssertSameEvents(expected.Events, events);
 
         var expectedMemory = new FuseMemory();
         foreach (var block in input.Memory)
@@ -59,10 +63,24 @@ public class FuseTests
 
         for (var address = 0; address < 0x10000; address++)
         {
-            var actual = memory.Read((ushort)address);
-            var wanted = expectedMemory.Read((ushort)address);
+            var actual = memory.Peek((ushort)address);
+            var wanted = expectedMemory.Peek((ushort)address);
             Assert.True(actual == wanted, $"Memory at {address:X4}: expected {wanted:X2}, got {actual:X2}");
         }
+    }
+
+    /// <summary>
+    /// Every bus event, in order and at the right T-state: memory reads and writes, port reads
+    /// and writes, and the contention points (MC for memory and internal cycles, PC for I/O).
+    /// </summary>
+    private static void AssertSameEvents(IReadOnlyList<FuseEvent> expected, List<FuseEvent> actual)
+    {
+        for (var i = 0; i < Math.Min(expected.Count, actual.Count); i++)
+        {
+            Assert.True(expected[i] == actual[i], $"Bus event {i}: expected {expected[i]}, got {actual[i]}");
+        }
+
+        Assert.True(expected.Count == actual.Count, $"Expected {expected.Count} bus events, got {actual.Count}");
     }
 
     private static (Dictionary<string, FuseInput>, Dictionary<string, FuseExpected>) LoadSuite()
@@ -110,9 +128,17 @@ public class FuseTests
 
     private static ushort Join(byte high, byte low) => (ushort)((high << 8) | low);
 
-    private sealed class FuseMemory : IMemory
+    /// <summary>
+    /// Flat RAM that logs every access like FUSE's test harness. Contention points are logged
+    /// (MC) but add no delay; 0x4000-0x7FFF counts as contended, which shapes I/O cycles.
+    /// </summary>
+    private sealed class FuseMemory(List<FuseEvent>? events = null) : IMemory
     {
         private readonly byte[] _ram = new byte[0x10000];
+
+        public Z80Cpu? Clock { get; set; }
+
+        private int Now => (int)(Clock?.TStates ?? 0);
 
         public void Load(FuseMemoryBlock block)
         {
@@ -122,16 +148,49 @@ public class FuseTests
             }
         }
 
-        public byte Read(ushort address) => _ram[address];
+        public byte Peek(ushort address) => _ram[address];
 
-        public void Write(ushort address, byte value) => _ram[address] = value;
+        public byte Read(ushort address)
+        {
+            events?.Add(new FuseEvent(Now, "MR", address, _ram[address]));
+            return _ram[address];
+        }
+
+        public void Write(ushort address, byte value)
+        {
+            events?.Add(new FuseEvent(Now, "MW", address, value));
+            _ram[address] = value;
+        }
+
+        public int ContentionDelay(ushort address, long tStates)
+        {
+            events?.Add(new FuseEvent((int)tStates, "MC", address, null));
+            return 0;
+        }
+
+        public bool IsContended(ushort address) => (address & 0xC000) == 0x4000;
     }
 
-    /// <summary>FUSE's test harness returns the high byte of the port on reads.</summary>
-    private sealed class FuseIo : IIo
+    /// <summary>FUSE's test harness returns the high byte of the port on reads, and logs every access.</summary>
+    private sealed class FuseIo(List<FuseEvent> events) : IIo
     {
-        public byte In(ushort port) => (byte)(port >> 8);
+        public Z80Cpu? Clock { get; set; }
 
-        public void Out(ushort port, byte value) { }
+        private int Now => (int)(Clock?.TStates ?? 0);
+
+        public byte In(ushort port)
+        {
+            var value = (byte)(port >> 8);
+            events.Add(new FuseEvent(Now, "PR", port, value));
+            return value;
+        }
+
+        public void Out(ushort port, byte value) => events.Add(new FuseEvent(Now, "PW", port, value));
+
+        public int ContentionDelay(ushort port, long tStates)
+        {
+            events.Add(new FuseEvent((int)tStates, "PC", port, null));
+            return 0;
+        }
     }
 }

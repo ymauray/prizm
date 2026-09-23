@@ -53,7 +53,7 @@ public sealed partial class Z80Cpu
                 }
                 else
                 {
-                    Internal(7);
+                    Internal(IR, 7);
                     IndexRegister = Add16(IndexRegister, GetRegisterPair(p));
                 }
 
@@ -65,7 +65,7 @@ public sealed partial class Z80Cpu
 
             case 3:
                 // INC rr / DEC rr: flags untouched.
-                Internal(2);
+                Internal(IR, 2);
                 SetRegisterPair(p, (ushort)(GetRegisterPair(p) + (q == 0 ? 1 : -1)));
                 break;
 
@@ -74,7 +74,7 @@ public sealed partial class Z80Cpu
                 {
                     var address = MemoryOperandAddress();
                     var value = ReadByte(address);
-                    Internal(1);
+                    Internal(address, 1);
                     WriteByte(address, Inc(value));
                 }
                 else
@@ -89,7 +89,7 @@ public sealed partial class Z80Cpu
                 {
                     var address = MemoryOperandAddress();
                     var value = ReadByte(address);
-                    Internal(1);
+                    Internal(address, 1);
                     WriteByte(address, Dec(value));
                 }
                 else
@@ -113,7 +113,7 @@ public sealed partial class Z80Cpu
                     // LD (IX+d),n: the displacement and n are read first, then 2 internal T-states.
                     var address = IndexedAddress(ReadOperand());
                     var operand = ReadOperand();
-                    Internal(2);
+                    Internal((ushort)(PC - 1), 2);
                     WriteByte(address, operand);
                 }
 
@@ -139,7 +139,7 @@ public sealed partial class Z80Cpu
                 break;
 
             case 2:
-                Internal(1);
+                Internal(IR, 1);
                 B--;
                 JumpRelative(B != 0);
                 break;
@@ -156,13 +156,20 @@ public sealed partial class Z80Cpu
 
     private void JumpRelative(bool taken)
     {
-        var offset = (sbyte)ReadOperand();
-        if (taken)
+        if (!taken)
         {
-            Internal(5);
-            PC = (ushort)(PC + offset);
-            WZ = PC;
+            // The displacement's cycle still runs (and can be stalled), but FUSE does not read
+            // the byte: its tests expect no memory read here.
+            Contend(PC);
+            TStates += 3;
+            PC++;
+            return;
         }
+
+        var offset = (sbyte)ReadOperand();
+        Internal((ushort)(PC - 1), 5);
+        PC = (ushort)(PC + offset);
+        WZ = PC;
     }
 
     /// <summary>LD (BC)/(DE)/(nn) from A or HL, and the reverse loads.</summary>
@@ -312,7 +319,7 @@ public sealed partial class Z80Cpu
         {
             case 0:
                 // RET cc
-                Internal(1);
+                Internal(IR, 1);
                 if (Condition(y))
                 {
                     PC = Pop();
@@ -346,7 +353,7 @@ public sealed partial class Z80Cpu
                             PC = IndexRegister;
                             break;
                         default:
-                            Internal(2);
+                            Internal(IR, 2);
                             SP = IndexRegister;
                             break;
                     }
@@ -382,7 +389,7 @@ public sealed partial class Z80Cpu
             case 5:
                 if (q == 0)
                 {
-                    Internal(1);
+                    Internal(IR, 1);
                     Push(GetRegisterPair2(p));
                 }
                 else if (p == 0)
@@ -405,7 +412,7 @@ public sealed partial class Z80Cpu
 
             default:
                 // RST
-                Internal(1);
+                Internal(IR, 1);
                 Push(PC);
                 PC = (ushort)(y * 8);
                 WZ = PC;
@@ -456,10 +463,10 @@ public sealed partial class Z80Cpu
                 var low = ReadByte(SP);
                 var high = ReadByte((ushort)(SP + 1));
                 var value = IndexRegister;
-                Internal(1);
+                Internal((ushort)(SP + 1), 1);
                 WriteByte((ushort)(SP + 1), (byte)(value >> 8));
                 WriteByte(SP, (byte)value);
-                Internal(2);
+                Internal(SP, 2);
                 IndexRegister = (ushort)(low | (high << 8));
                 WZ = IndexRegister;
                 break;
@@ -481,10 +488,13 @@ public sealed partial class Z80Cpu
         }
     }
 
-    /// <summary>Pushes the return address and jumps. The extra T-state comes before the push.</summary>
+    /// <summary>
+    /// Pushes the return address and jumps. The extra T-state comes before the push, with the
+    /// address of the operand's high byte still on the bus.
+    /// </summary>
     private void Call(ushort address)
     {
-        Internal(1);
+        Internal((ushort)(PC - 1), 1);
         Push(PC);
         PC = address;
     }
@@ -518,7 +528,7 @@ public sealed partial class Z80Cpu
         }
 
         var address = IndexedAddress(ReadOperand());
-        Internal(5);
+        Internal((ushort)(PC - 1), 5);
         return address;
     }
 
