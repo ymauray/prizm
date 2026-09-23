@@ -46,7 +46,8 @@ jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`
 - `src/iSpectrum.App` : fenêtre Raylib-cs (image ×3 sous une barre de menu) ; `MenuBar` (menus
   File, Machine, Tape, Debug, Help dessinés dans la fenêtre ; menus et raccourcis partagent une
   seule liste de commandes), `DebuggerPanel` et `SpectrumFont` (le débogueur, dans la police de
-  la ROM), `AboutBox` (licence et copyright des ROM, dans la même police), `KeyboardInput`
+  la ROM), `AboutBox` (licence et copyright des ROM, dans la même police), `SelectBox` (menu
+  d'un bloc TZX « select »), `KeyboardInput`
   (clavier du Mac traduit, mode étendu compris), `AudioOutput` (son, et cadence de
   l'émulation), `HostShell` (sélecteur de fichier, Finder). Messages dans le titre de la fenêtre.
 - `examples/hello.asm` : premier programme pour sjasmplus (snapshot, cassette et symboles).
@@ -61,8 +62,8 @@ jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`
   ligne de commande.
 - Machine : adressage écran, attributs, bordure au fil du faisceau, contention, bus flottant,
   mémoire 48K et 128K (pagination, verrou, banques contendues), clavier, beeper, AY (registres,
-  hauteur, enveloppes), cassette (fronts du signal, blocs TZX d'arrêt, détection de
-  chargeur), snapshots des deux modèles, mode sans affichage.
+  hauteur, enveloppes), cassette (fronts du signal, blocs TZX d'arrêt, bloc « select »,
+  détection de chargeur), snapshots des deux modèles, mode sans affichage.
 - TZX : les fichiers de test de libspectrum (GPL), dont `complete-tzx.tzx` (un bloc de presque
   chaque type), comparés front par front aux listes que libspectrum attend ; fichiers
   corrompus rejetés, boucles et sauts qui finissent.
@@ -183,8 +184,8 @@ Son et App :
 ### Reste en suspens
 
 - Tests visuels de l'ULA (`btime`, `stime`, `ulatest3`) : licence et références à trouver.
-- TZX : bloc « select » (`0x28`) ignoré ; les blocs CSW et « generalized data » sont décodés
-  en mémoire à l'ouverture.
+- TZX : les blocs CSW et « generalized data » sont décodés en mémoire à l'ouverture (quelques
+  mégaoctets au plus : sans conséquence).
 
 Souhaitable un jour, sans échéance :
 

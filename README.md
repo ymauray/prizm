@@ -82,7 +82,9 @@ blocs se chargent toujours en temps réel, même en chargement rapide, et **Turb
 les accélère. La cassette démarre d'elle-même quand la ROM ou un chargeur écoute le signal, et
 s'arrête aux blocs qui le demandent (entre deux niveaux, par exemple). Si un programme attend
 qu'on relance la cassette sans l'écouter, **Tape > Play / Stop** (Cmd+Shift+P) la relance ;
-**Tape > Rewind** la rembobine. Pour un jeu en plusieurs faces ou cassettes, **Tape > Insert
+**Tape > Rewind** la rembobine. Quand une cassette `.TZX` propose un menu (face A ou B, choix
+du niveau…), elle s'arrête et l'affiche : les flèches et Entrée, un chiffre ou un clic
+choisissent, Échap continue au bloc suivant. Pour un jeu en plusieurs faces ou cassettes, **Tape > Insert
 tape...** (Cmd+Shift+O) met une autre cassette dans le lecteur sans redémarrer la machine,
 contrairement à **File > Open**.
 
