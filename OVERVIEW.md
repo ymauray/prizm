@@ -184,19 +184,28 @@ iSpectrum/
 ├── AGENTS.md                 # Consignes pour les agents de code (CLAUDE.md y renvoie)
 ├── LICENSE                   # GNU GPL v2 (le projet est GPL-2.0-or-later)
 ├── OVERVIEW.md
+├── README.md                 # Utilisation : menus, clavier, snapshots, cassettes, débogueur
 ├── Directory.Build.props     # net10.0, Nullable, TreatWarningsAsErrors pour tous les projets
 ├── iSpectrum.sln
 ├── src/
-│   ├── iSpectrum.Z80/        # CPU Z80 pur, sans dépendance (IMemory, IIo)
-│   ├── iSpectrum.Core/       # Machine : mémoire, ULA, clavier, son, frame, snapshots, cassettes
-│   └── iSpectrum.App/        # Front-end : fenêtre, rendu, clavier, son, fichiers (Raylib-cs)
+│   ├── iSpectrum.Z80/        # CPU Z80 pur (IMemory, IIo), désassembleur
+│   ├── iSpectrum.Core/       # Machines 48K et 128K : mémoire, ULA, clavier, son, AY, frame
+│   │   ├── Tape/             # .TAP et lecteur de cassette
+│   │   ├── Snapshots/        # .SNA et .Z80
+│   │   └── Debugging/        # Débogueur, symboles, ligne de commande
+│   └── iSpectrum.App/        # Front-end Raylib-cs : fenêtre, menus, clavier, son, débogueur
 ├── tests/
 │   ├── iSpectrum.Z80.Tests/
 │   │   ├── Fuse/             # Suite FUSE + parseur et runner (provenance dans README.md)
 │   │   └── Zex/              # ZEXDOC/ZEXALL + harnais CP/M (provenance dans README.md)
-│   └── iSpectrum.Core.Tests/ # Écran, attributs, mémoire, clavier, son, ROM, SNA/Z80, TAP
-├── local/                    # Ignoré par Git : fichiers de test personnels (jeux…)
-├── README.md
+│   └── iSpectrum.Core.Tests/
+│       ├── Z80Test/          # z80test de Patrik Rak, MIT (provenance dans README.md)
+│       ├── ThirdParty/       # Tests de timing de Richard Butler (fichiers dans local/)
+│       ├── Debugging/, Snapshots/, Tape/
+│       └── *.cs              # Écran, ULA, contention, mémoire, clavier, son, AY, ROM…
+├── examples/
+│   └── hello.asm             # Premier programme pour sjasmplus
+├── local/                    # Ignoré par Git : jeux, fichiers de test tiers, builds
 └── roms/
     ├── README.md             # Provenance et copyright Amstrad
     ├── 48.rom                # ROM du 48K (Sinclair/Amstrad, voir §8)
@@ -210,42 +219,66 @@ donc changer de front-end (Avalonia, MonoGame…) sans toucher à l'émulation.
 ### Interfaces de base
 
 ```csharp
-public interface IMemory { byte Read(ushort addr); void Write(ushort addr, byte value); }
-public interface IIo     { byte In(ushort port);   void Out(ushort port, byte value); }
+public interface IMemory
+{
+    byte Read(ushort address);
+    void Write(ushort address, byte value);
+    int ContentionDelay(ushort address, long tStates) => 0;  // attente imposée par l'ULA
+    bool IsContended(ushort address) => false;
+}
+
+public interface IIo
+{
+    byte In(ushort port);
+    void Out(ushort port, byte value);
+    int ContentionDelay(ushort port, long tStates) => 0;
+}
 
 public sealed partial class Z80Cpu
 {
-    public byte A, F, B, C, D, E, H, L;
+    public byte A, B, C, D, E, H, L;
+    public byte F { get; set; }                   // propriété : note les écritures (registre Q)
     public byte A_, F_, B_, C_, D_, E_, H_, L_;   // jeu alternatif A', F'…
-    public ushort IX, IY, SP, PC;
-    public ushort WZ;                             // MEMPTR (registre interne)
+    public ushort IX, IY, SP, PC, WZ;             // WZ = MEMPTR
     public byte I, R;
-    public bool IFF1, IFF2;
+    public bool IFF1, IFF2, Halted;
     public int IM;
-    public bool Halted;
     public long TStates;
 
     public Z80Cpu(IMemory memory, IIo io);
     public void Reset();      // état à la mise sous tension (AF = SP = 0xFFFF, comme FUSE)
-    public void Step();       // fetch – decode – execute d'une instruction
+    public void Step();       // une instruction, préfixes DD/FD compris
     public bool Interrupt();  // INT masquable ; false si refusée (DI, juste après EI)
 }
 ```
 
 ### Boucle principale
 
+`Spectrum` (base de `Spectrum48` et `Spectrum128`) exécute la machine instruction par
+instruction ; `RunFrame()` répète `Step()` jusqu'à la fin d'une frame :
+
 ```csharp
-public void RunFrame()
+public bool Step()                // true quand la frame se termine
 {
-    while (cpu.TStates < 69888) cpu.Step();
-    cpu.TStates -= 69888;
-    cpu.Interrupt();          // 50 Hz ; à réessayer tant que INT est maintenue si elle est refusée
-    ula.RenderFrame(memory);  // framebuffer 320×256 (écran + bordure)
-    beeper.EndFrame();        // buffer audio de la frame
+    // Début de frame : échantillons du beeper, frappe automatique.
+    // INT est maintenue pendant les 32 (48K) ou 36 (128K) premiers T-states :
+    if (!interruptTaken && Cpu.TStates < Timings.InterruptLength)
+        interruptTaken = Cpu.Interrupt();
+    // Interceptions de LD-BYTES (cassette) si la ROM qui la contient est paginée.
+    Cpu.Step();
+    if (Cpu.TStates >= Timings.FrameTStates)
+    {
+        Ula.EndFrameSound(...);   // cassette et AY amenés au même T-state, fin du son
+        Cpu.TStates -= Timings.FrameTStates;
+        Ula.EndFrame(Memory.Screen);  // fin de l'image (dessinée au fil du faisceau)
+        return true;
+    }
+    return false;
 }
 ```
 
-Le front-end appelle `RunFrame()` puis se synchronise à 50 Hz (idéalement sur l'audio).
+Le front-end exécute autant de frames que la carte son en demande, puis affiche la dernière
+image ; avec le débogueur, c'est `Debugger.RunFrame()` qui fait tourner la machine.
 
 ---
 
@@ -269,6 +302,7 @@ Organisation du code (`src/iSpectrum.Z80`) :
 | `Z80Cpu.Opcodes.cs` | `Step`, gestion des préfixes `DD`/`FD`, opcodes sans préfixe |
 | `Z80Cpu.Cb.cs` | Préfixe `CB`, et `DDCB`/`FDCB` |
 | `Z80Cpu.Ed.cs` | Préfixe `ED`, dont les instructions de bloc |
+| `Z80Disassembler.cs` | Désassembleur : texte et longueur de chaque instruction, symboles |
 
 Timing : chaque accès au bus ajoute la durée de son cycle machine (lecture d'opcode 4 T-states,
 lecture ou écriture mémoire 3, port 4) ; seuls les cycles internes sont ajoutés à la main
@@ -331,8 +365,10 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 - **Front-end v1 : Raylib-cs**
   - fournit les bibliothèques natives macOS / Linux / Windows via NuGet ;
   - une texture 320×256 mise à jour à chaque frame, mise à l'échelle ×2 / ×3 ;
-  - flux audio intégré (`AudioStream`) pour le beeper ;
-  - gestion clavier et glisser-déposer de fichiers.
+  - flux audio intégré (`AudioStream`) pour le beeper et l'AY ;
+  - gestion clavier et glisser-déposer de fichiers ;
+  - barre de menu et débogueur dessinés dans la fenêtre (police de Raylib pour les menus,
+    police de la ROM du Spectrum pour le débogueur).
 - **Option ultérieure : Avalonia** (`WriteableBitmap`) si l'on veut une vraie application Mac
   avec menus natifs, dialogues d'ouverture, préférences. Audio alors via OpenAL (Silk.NET).
 - Packaging macOS : bundle `.app` (et plus tard signature/notarisation si distribution).
