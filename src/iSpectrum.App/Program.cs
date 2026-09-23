@@ -11,6 +11,7 @@ const int FramesPerSecond = 50;
 
 var romPath = Path.Combine(AppContext.BaseDirectory, "roms", "48.rom");
 var spectrum = new Spectrum48(File.ReadAllBytes(romPath));
+var keyboardInput = new KeyboardInput();
 
 Raylib.InitWindow(Ula.FrameWidth * Scale, Ula.FrameHeight * Scale, "iSpectrum");
 Raylib.SetTargetFPS(FramesPerSecond);
@@ -28,7 +29,7 @@ var source = new Rectangle(0, 0, Ula.FrameWidth, Ula.FrameHeight);
 
 while (!Raylib.WindowShouldClose())
 {
-    KeyMap.Apply(spectrum.Keyboard);
+    keyboardInput.Update(spectrum.Keyboard);
     spectrum.RunFrame();
     Raylib.UpdateTexture(texture, spectrum.FrameBuffer);
 
