@@ -67,6 +67,7 @@ public sealed class Ula : IIo, IScreenWriteObserver
     {
         _timings = timings;
         Beeper = new Beeper(timings.ClockRate);
+        _soundSources = [Tape];
     }
 
     /// <summary>The key matrix read through port 0xFE.</summary>
@@ -77,6 +78,9 @@ public sealed class Ula : IIo, IScreenWriteObserver
 
     /// <summary>The tape deck, whose signal is read on bit 6 of port 0xFE (EAR).</summary>
     public TapePlayer Tape { get; } = new();
+
+    /// <summary>What changes the sound besides the speaker: the tape, and the AY on the 128K.</summary>
+    private ISoundSource[] _soundSources = [];
 
     /// <summary>
     /// Border colour, 0-7, as last written to port 0xFE. Setting it directly (snapshot loading)
@@ -123,7 +127,7 @@ public sealed class Ula : IIo, IScreenWriteObserver
             return FloatingBus((_cpu?.TStates ?? 0) + IoDataLatchDelay);
         }
 
-        Tape.AdvanceTo(_cpu?.TStates ?? 0, Beeper);
+        AdvanceSounds(_cpu?.TStates ?? 0);
         var ear = (Tape.IsPlaying ? Tape.Level : _speakerHigh) ? 0x40 : 0;
         return (byte)(0xA0 | ear | Keyboard.Read((byte)(port >> 8)));
     }
@@ -206,8 +210,8 @@ public sealed class Ula : IIo, IScreenWriteObserver
         var time = _cpu?.TStates ?? 0;
         var color = value & 0x07;
 
-        // The tape's edges up to now must reach the beeper before this speaker change.
-        Tape.AdvanceTo(time, Beeper);
+        // The other sources' changes up to now must reach the beeper before this speaker change.
+        AdvanceSounds(time);
 
         if (color != _border)
         {
@@ -233,9 +237,26 @@ public sealed class Ula : IIo, IScreenWriteObserver
     /// </summary>
     public void EndFrameSound(long now, int frameTStates)
     {
-        Tape.AdvanceTo(now, Beeper);
+        AdvanceSounds(now);
         Beeper.EndFrame(frameTStates);
-        Tape.EndFrame(frameTStates);
+        foreach (var source in _soundSources)
+        {
+            source.EndFrame(frameTStates);
+        }
+    }
+
+    /// <summary>Adds a sound source (setup only, not while running).</summary>
+    public void AddSoundSource(ISoundSource source) => _soundSources = [.. _soundSources, source];
+
+    /// <summary>Brings every sound source up to the CPU's current T-state, before a change to one of them.</summary>
+    public void CatchUpSound() => AdvanceSounds(_cpu?.TStates ?? 0);
+
+    private void AdvanceSounds(long time)
+    {
+        foreach (var source in _soundSources)
+        {
+            source.AdvanceTo(time, Beeper);
+        }
     }
 
     /// <summary>Finishes drawing the frame, then starts the next one: FLASH counter, border changes.</summary>

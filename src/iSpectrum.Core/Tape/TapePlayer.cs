@@ -9,7 +9,7 @@ namespace iSpectrum.Core.Tape;
 /// and a one-second pause after each block. Each pulse ends with an edge (the level flips).
 /// </summary>
 /// <remarks>Timings: The Complete Spectrum ROM Disassembly, and the TZX format description.</remarks>
-public sealed class TapePlayer
+public sealed class TapePlayer : ISoundSource
 {
     public const int PilotPulse = 2168;
     public const int HeaderPilotPulses = 8063;

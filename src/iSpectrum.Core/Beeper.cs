@@ -23,6 +23,9 @@ public sealed class Beeper
     /// <summary>Loudness of the tape signal relative to the speaker.</summary>
     private const double TapeVolume = 0.5;
 
+    /// <summary>Loudness of a sound chip at full output (all its channels at full volume).</summary>
+    private const double ChipVolume = 1.0;
+
     /// <summary>High-pass coefficient: a time constant of about 200 samples (4.5 ms).</summary>
     private const double DcBlocking = 0.995;
 
@@ -31,6 +34,7 @@ public sealed class Beeper
 
     private bool _speaker;
     private bool _tape;
+    private double _chip;
 
     /// <summary>T-state (from the start of the frame) up to which the level has been integrated.</summary>
     private double _time;
@@ -80,7 +84,14 @@ public sealed class Beeper
         _tape = high;
     }
 
-    private double Level => (_speaker ? 1 : 0) + (_tape ? TapeVolume : 0);
+    /// <summary>Records the output of a sound chip (the 128K's AY), 0 to 1, at <paramref name="tStates"/>.</summary>
+    public void SetChipLevel(long tStates, double level)
+    {
+        Advance(tStates);
+        _chip = level;
+    }
+
+    private double Level => (_speaker ? 1 : 0) + (_tape ? TapeVolume : 0) + (_chip * ChipVolume);
 
     /// <summary>
     /// Produces the samples up to the end of the frame, then makes the times relative to the next
