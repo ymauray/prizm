@@ -46,7 +46,8 @@ machine et plan par jalons.
 
 - Toute modification du Z80 doit garder au vert :
   - la suite **FUSE** (`tests.in` / `tests.expected`) ;
-  - **ZEXDOC** et **ZEXALL** via le harnais CP/M (les deux passent depuis le jalon 1).
+  - **ZEXDOC** et **ZEXALL** via le harnais CP/M (les deux passent depuis le jalon 1) ;
+  - les six programmes de **z80test** (`tests/iSpectrum.Core.Tests/Z80Test`).
 - ZEXDOC et ZEXALL sont marqués `Category=Slow` : chacun exécute environ 47 milliards de T-states
   (environ 50 s en Release, plusieurs minutes en Debug). Run rapide : `dotnet test --filter "Category!=Slow"`.
 - Ajouter des tests unitaires pour : adressage écran, décodage des attributs, matrice clavier,

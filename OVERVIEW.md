@@ -22,7 +22,8 @@ Ce qui existe :
 
 - `src/iSpectrum.Z80` : CPU complet — toutes les instructions, préfixes `CB`, `ED`, `DD`, `FD`,
   `DDCB`, `FDCB`, opcodes non documentés, bits 3 et 5 des drapeaux, MEMPTR ; interruptions
-  IM 0/1/2, `HALT`, retard après `EI` ; un point de contention à chaque cycle de bus, via
+  IM 0/1/2, `HALT`, retard après `EI` ; registre interne « Q » (`SCF`/`CCF`) ; drapeaux des
+  instructions de bloc interrompues ; un point de contention à chaque cycle de bus, via
   `IMemory.ContentionDelay`, `IMemory.IsContended` et `IIo.ContentionDelay` (0 par défaut).
 - `src/iSpectrum.Core` : `Contention48K` (table des délais de l'ULA), `Memory48K` (ROM protégée
   en écriture, RAM `0x4000`-`0x7FFF` contendue), `Ula` (port `0xFE` : clavier
@@ -44,7 +45,8 @@ Ce qui existe :
   `~/Documents/iSpectrum`, Cmd+F ouvre ce dossier ; Cmd+L bascule chargement réel / rapide,
   Cmd+T le turbo pendant un chargement. Messages dans le titre de la fenêtre (pas encore de
   texte à l'écran).
-- Tests : suite FUSE (1356 tests, événements de bus compris), ZEXDOC et ZEXALL (catégorie `Slow`), interruptions,
+- Tests : suite FUSE (1356 tests, événements de bus compris), ZEXDOC, ZEXALL et les six
+  programmes de z80test (catégorie `Slow`), interruptions,
   adressage écran, attributs, bordure, protection de la ROM, matrice clavier, et deux tests sur
   la vraie ROM qui relisent l'écran en comparant chaque case à la police de la ROM : le message
   de copyright au démarrage, puis `PRINT 2+2` et `PRINT "A+B=C"` tapés au clavier.
@@ -68,10 +70,14 @@ Ce qui existe :
 
 Choix de comportement déjà faits (détaillés en commentaire dans le code) :
 
-- `SCF` / `CCF` : bits 3 et 5 pris dans `A | F`, comme FUSE (l'effet du registre interne « Q »
-  n'est pas émulé).
-- Instructions de bloc répétées (`LDIR`, `INIR`…) : drapeaux comme FUSE, sans les effets liés
-  à PC décrits en 2018.
+- `SCF` / `CCF` : bits 3 et 5 pris dans `(Q xor F) or A`, comportement des Z80 Zilog. Q vaut F
+  si l'instruction précédente a écrit les drapeaux, 0 sinon ; `POP AF` et `EX AF,AF'` chargent F
+  sans le calculer et laissent Q à 0. Vérifié par z80ccf.
+- Instructions de bloc interrompues pendant une répétition (`LDIR`, `CPIR`, `INIR`, `OTIR` et
+  variantes) : bits 5 et 3 de F pris dans les bits 13 et 11 de PC ; pour les entrées-sorties, H
+  et P/V recalculés et MEMPTR = PC + 1 (David Banks, 2018, comme MAME). Vérifié par z80test ;
+  cinq cas FUSE, antérieurs à ces découvertes, suivent ici la machine réelle (voir le README
+  des tests FUSE).
 - `OUT (C),0` envoie 0 (Z80 NMOS du Spectrum).
 - Pendant l'acquittement d'une interruption, le bus de données lit `0xFF` : IM 0 se comporte
   comme IM 1 (`RST 38h`), IM 2 lit son vecteur en `I × 256 + 0xFF`.
@@ -82,7 +88,8 @@ Choix de comportement déjà faits (détaillés en commentaire dans le code) :
 - L'image entière est rendue en fin de frame à partir de la mémoire (pas encore ligne par ligne).
 - Palette : 0xD7 par composante pour les couleurs normales, 0xFF pour les couleurs vives.
 - Port `0xFE` en lecture : bits 0-4 = demi-rangées choisies par les lignes A8-A15 à 0 ; bits
-  5 et 7 à 1 ; bit 6 (EAR) à 1 tant que l'entrée cassette n'existe pas.
+  5 et 7 à 1 ; bit 6 (EAR) = signal de la cassette quand elle joue, sinon le bit 4 du dernier
+  `OUT` (carte « issue 3 ») : `0xBF` sans touche enfoncée, comme l'attend z80test.
 - Clavier du Mac **traduit par caractère**, quelle que soit la disposition : le système dit
   quel caractère une touche a tapé (`"` = Maj+2 sur un clavier suisse), et l'App tient
   enfoncées les touches Spectrum correspondantes (Symbol Shift + P) tant que la touche du Mac
@@ -150,10 +157,11 @@ Reste en suspens :
 1. ~~les tests de timing de Richard Butler (zxspectrum4.net)~~ : **faits** — les 72 tests passent
    (machine « early timing »), y compris 35 à 37, qui mesurent le bus flottant ; le programme
    et ses écrans restent dans `local/timing-tests/` (licence à vérifier) ;
-2. `btime.tap`, `stime.tap`, `ulatest3.tap` (Spectrum Clone Design) : timing de la bordure, de
+2. ~~z80test de Patrik Rak (MIT)~~ : **fait** — les six programmes passent, après l'ajout du
+   registre Q, des drapeaux des instructions de bloc interrompues et du bit EAR « issue 3 » ;
+3. `btime.tap`, `stime.tap`, `ulatest3.tap` (Spectrum Clone Design) : timing de la bordure, de
    l'écran et du bus flottant, à vérifier à l'œil ; auteurs et licence à vérifier ;
-3. z80test de Patrik Rak (MIT) : tests CPU plus poussés que FUSE (dont `SCF`/`CCF` et le registre
-   « Q ») ; quelques échecs attendus.
+4. un mode sans affichage (ni image ni son) pour les tests et le turbo, après mesure.
 
 Ensuite, **jalon 8** : modèle 128K (pagination par le port `0x7FFD`, puce son AY-3-8912).
 
