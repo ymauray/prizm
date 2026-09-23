@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <PackageLicenseExpression>GPL-2.0-or-later</PackageLicenseExpression>
-    <Copyright>Copyright (C) 2026 The iSpectrum contributors</Copyright>
+    <Copyright>Copyright (C) 2026 The Prizm contributors</Copyright>
   </PropertyGroup>
 
 </Project>

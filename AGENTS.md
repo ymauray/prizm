@@ -1,6 +1,6 @@
 # AGENTS.md — Consignes pour les agents de code
 
-Ce fichier s'adresse à tout agent de code (Claude Code, Codex, etc.) travaillant sur **iSpectrum**.
+Ce fichier s'adresse à tout agent de code (Claude Code, Codex, etc.) travaillant sur **Prizm**.
 Lire aussi **`OVERVIEW.md`** : état d'avancement (§0), architecture, détails techniques de la
 machine et plan par jalons.
 
@@ -20,11 +20,11 @@ machine et plan par jalons.
 
 ## Architecture — règles à respecter
 
-- `src/iSpectrum.Z80` : CPU Z80 **pur**. Aucune dépendance hormis la BCL. Accès au monde
+- `src/Prizm.Z80` : CPU Z80 **pur**. Aucune dépendance hormis la BCL. Accès au monde
   extérieur uniquement via `IMemory` et `IIo`.
-- `src/iSpectrum.Core` : machine Spectrum (mémoire, ULA, clavier, beeper, formats de fichiers).
+- `src/Prizm.Core` : machine Spectrum (mémoire, ULA, clavier, beeper, formats de fichiers).
   **Aucune dépendance graphique ou audio.** Expose un framebuffer, un buffer audio et une API clavier.
-- `src/iSpectrum.App` : seul projet autorisé à référencer Raylib-cs (fenêtre, rendu, audio, entrées).
+- `src/Prizm.App` : seul projet autorisé à référencer Raylib-cs (fenêtre, rendu, audio, entrées).
 - Les projets de tests ne référencent que `Z80` et `Core`, jamais `App`.
 
 ## Conventions de code
@@ -32,7 +32,7 @@ machine et plan par jalons.
 - Code, identifiants et commentaires **en anglais** ; documentation (`*.md`) en **français**.
 - Chaque fichier `.cs` commence par l'en-tête de licence :
   `// SPDX-License-Identifier: GPL-2.0-or-later` puis
-  `// Copyright (C) 2026 The iSpectrum contributors`.
+  `// Copyright (C) 2026 The Prizm contributors`.
 - N'ajouter une dépendance que si sa licence est compatible avec la GPL v2 (MIT, BSD, zlib…).
   Apache 2.0 n'est compatible qu'avec la GPL v3 : réservé aux outils qui ne sont pas distribués
   avec le programme (xUnit, par exemple).
@@ -47,7 +47,7 @@ machine et plan par jalons.
 - Toute modification du Z80 doit garder au vert :
   - la suite **FUSE** (`tests.in` / `tests.expected`) ;
   - **ZEXDOC** et **ZEXALL** via le harnais CP/M (les deux passent depuis le jalon 1) ;
-  - les six programmes de **z80test** (`tests/iSpectrum.Core.Tests/Z80Test`).
+  - les six programmes de **z80test** (`tests/Prizm.Core.Tests/Z80Test`).
 - ZEXDOC et ZEXALL sont marqués `Category=Slow` : chacun exécute environ 47 milliards de T-states
   (environ 50 s en Release, plusieurs minutes en Debug). Run rapide : `dotnet test --filter "Category!=Slow"`.
 - Ajouter des tests unitaires pour : adressage écran, décodage des attributs, matrice clavier,
@@ -80,5 +80,5 @@ machine et plan par jalons.
   Richard Butler (`timing_tests_48k_v1.0.z80` et ses 4 écrans `.scr` dans `local/timing-tests/`,
   obtenus depuis <https://github.com/MrKWatkins/EmulatorTestSuites> ou <https://www.zxspectrum4.net/op_timing.php>)
   dont la licence n'est pas formellement déclarée en open source. Les tests qui en dépendent sont
-  alors ignorés s'il manque (voir `tests/iSpectrum.Core.Tests/ThirdParty/LocalFile.cs` et `README.md`).
+  alors ignorés s'il manque (voir `tests/Prizm.Core.Tests/ThirdParty/LocalFile.cs` et `README.md`).
 - Ne jamais committer de jeux commerciaux ni de fichiers sous copyright.

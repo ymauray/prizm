@@ -1,14 +1,14 @@
 ; SPDX-License-Identifier: GPL-2.0-or-later
-; Copyright (C) 2026 The iSpectrum contributors
+; Copyright (C) 2026 The Prizm contributors
 ;
-; A first program for iSpectrum, assembled with sjasmplus:
+; A first program for Prizm, assembled with sjasmplus:
 ;
 ;   sjasmplus --sym=hello.sym examples/hello.asm
 ;
 ; writes, in the current folder:
 ;   hello.sna  a snapshot, to develop with: it loads at once and starts at `start`;
 ;   hello.tap  a tape, to share: it loads as in 1983 (slowly: most of the RAM is saved);
-;   hello.sym  the symbols, which iSpectrum's debugger reads when it opens hello.sna or
+;   hello.sym  the symbols, which Prizm's debugger reads when it opens hello.sna or
 ;              hello.tap from the same folder.
 
         DEVICE ZXSPECTRUM48

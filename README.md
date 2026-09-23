@@ -1,4 +1,4 @@
-# iSpectrum
+# Prizm
 
 Émulateur ZX Spectrum **48K** et **128K** écrit en C# (.NET 10), pensé d'abord pour macOS sur
 Apple Silicon. Il démarre les ROM d'origine, on y tape du BASIC au clavier du Mac, le beeper et
@@ -11,7 +11,7 @@ les règles de contribution (y compris pour les agents de code) dans [`AGENTS.md
 ## Lancer
 
 ```sh
-dotnet run --project src/iSpectrum.App
+dotnet run --project src/Prizm.App
 ```
 
 ## Menus
@@ -24,7 +24,7 @@ Une barre de menu, en haut de la fenêtre, réunit toutes les commandes avec leu
 | **Machine** | ZX Spectrum 48K (Cmd+1), ZX Spectrum 128K (Cmd+2), Reset (Cmd+R) |
 | **Tape** | Insert tape... (Cmd+Shift+O), Play / Stop (Cmd+Shift+P), Rewind, New recording, Fast loading (Cmd+L), Turbo while loading (Cmd+T) |
 | **Debug** | Show debugger (Cmd+D), Pause / Continue (Cmd+P), Step into (Cmd+I), Step over (Cmd+N), Step out (Cmd+U) |
-| **Help** | About iSpectrum (licence et copyright des ROM) |
+| **Help** | About Prizm (licence et copyright des ROM) |
 
 **File > Reload** (Cmd+Shift+R) rouvre le dernier fichier ouvert.
 
@@ -67,7 +67,7 @@ L'émulateur ouvre les snapshots `.SNA` et `.Z80` (48K et 128K) et les cassettes
 
 - glisser-déposer du fichier sur la fenêtre ;
 - **Cmd+O** : sélecteur de fichier (macOS ; `zenity` sous Linux) ;
-- en argument : `dotnet run --project src/iSpectrum.App -- jeu.tap`.
+- en argument : `dotnet run --project src/Prizm.App -- jeu.tap`.
 
 Une cassette redémarre la machine, qui tape `LOAD ""` d'elle-même (sur le 128K, elle choisit
 « Tape Loader » dans le menu). Par défaut, elle se charge **en temps réel**, comme en 1983 : son de chargement, bandes de couleur dans la bordure, et
@@ -88,7 +88,7 @@ choisissent, Échap continue au bloc suivant. Pour un jeu en plusieurs faces ou 
 tape...** (Cmd+Shift+O) met une autre cassette dans le lecteur sans redémarrer la machine,
 contrairement à **File > Open**.
 
-**Cmd+S** sauvegarde l'état de la machine en `.SNA` dans `~/Documents/iSpectrum/`, et
+**Cmd+S** sauvegarde l'état de la machine en `.SNA` dans `~/Documents/Prizm/`, et
 **Cmd+F** ouvre ce dossier dans le Finder.
 
 `SAVE` enregistre dans ce même dossier, instantanément, dans un `.TAP` nommé d'après le
@@ -100,7 +100,7 @@ fichiers sous copyright dans le dépôt.
 
 ## Écrire ses programmes
 
-iSpectrum est pensé pour développer en assembleur Z80 avec
+Prizm est pensé pour développer en assembleur Z80 avec
 [sjasmplus](https://github.com/z00m128/sjasmplus). L'exemple `examples/hello.asm` affiche un
 message par la ROM :
 
@@ -173,9 +173,9 @@ Richard Butler se déposent dans `local/timing-tests/` (voir section *Tester* ci
 
 ## Licence
 
-Copyright © 2026 les contributeurs d'iSpectrum.
+Copyright © 2026 les contributeurs de Prizm.
 
-iSpectrum est un logiciel libre, distribué sous licence **GNU GPL version 2 ou ultérieure**
+Prizm est un logiciel libre, distribué sous licence **GNU GPL version 2 ou ultérieure**
 (`GPL-2.0-or-later`) : vous pouvez le redistribuer et le modifier selon les termes de la GPL,
 version 2 ou (à votre choix) toute version ultérieure. Il est fourni sans aucune garantie.
 Texte complet dans [`LICENSE`](LICENSE).

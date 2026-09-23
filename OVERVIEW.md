@@ -1,4 +1,4 @@
-# iSpectrum — Émulateur ZX Spectrum en C#
+# Prizm — Émulateur ZX Spectrum en C#
 
 Projet personnel / open source d'émulateur ZX Spectrum écrit en C# (.NET), sous licence
 GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
@@ -11,7 +11,7 @@ GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
 
 ## 0. État d'avancement
 
-**Jalons 1 à 11 terminés** (tags Git `jalon-1` à `jalon-11`) : iSpectrum émule le ZX Spectrum
+**Jalons 1 à 11 terminés** (tags Git `jalon-1` à `jalon-11`) : Prizm émule le ZX Spectrum
 **48K** et le **128K** (mémoire paginée, puce son AY-3-8912), avec un **débogueur intégré**
 pensé pour développer en assembleur (sjasmplus, symboles, rechargement en une touche). On y tape du BASIC au clavier du
 Mac, le son sort, il charge et sauvegarde des snapshots `.SNA` et `.Z80`, charge des cassettes
@@ -27,12 +27,12 @@ carte son), `SAVE` vers un `.TAP`, menu du bloc TZX « select », démarrage en 
 
 ### Ce qui existe
 
-- `src/iSpectrum.Z80` : CPU complet — toutes les instructions, préfixes `CB`, `ED`, `DD`, `FD`,
+- `src/Prizm.Z80` : CPU complet — toutes les instructions, préfixes `CB`, `ED`, `DD`, `FD`,
   `DDCB`, `FDCB`, opcodes non documentés, bits 3 et 5 des drapeaux, MEMPTR, registre interne
   « Q » ; interruptions IM 0/1/2, `HALT`, retard après `EI` ; un point de contention à chaque
   cycle de bus (`IMemory.ContentionDelay`, `IMemory.IsContended`, `IIo.ContentionDelay`, 0 par
   défaut) ; `Z80Disassembler` (toutes les instructions, symboles).
-- `src/iSpectrum.Core`, la machine :
+- `src/Prizm.Core`, la machine :
   - `Spectrum` (base commune : CPU, ULA, cassette, boucle de frame, `Step`, chargement rapide,
     mode `Headless`), `Spectrum48`, `Spectrum128` ;
   - `SpectrumTimings` (horloge, frame, ligne, premier pixel, table de contention, par modèle) ;
@@ -47,7 +47,7 @@ carte son), `SAVE` vers un `.TAP`, menu du bloc TZX « select », démarrage en 
     `SnaFormat`, `Z80Format`, `Snapshot` ;
   - `Debugging/` : `Debugger` (pause, pas à pas, points d'arrêt et surveillances),
     `SymbolTable` (fichiers de symboles), `DebuggerCommands` (ligne de commande).
-- `src/iSpectrum.App` : fenêtre Raylib-cs (image ×3 sous une barre de menu) ; `MenuBar` (menus
+- `src/Prizm.App` : fenêtre Raylib-cs (image ×3 sous une barre de menu) ; `MenuBar` (menus
   File, Machine, Tape, Debug, Help dessinés dans la fenêtre ; menus et raccourcis partagent une
   seule liste de commandes), `DebuggerPanel` et `SpectrumFont` (le débogueur, dans la police de
   la ROM), `AboutBox` (licence et copyright des ROM, dans la même police), `SelectBox` (menu
@@ -84,7 +84,7 @@ carte son), `SAVE` vers un `.TAP`, menu du bloc TZX « select », démarrage en 
   `timing_tests_48k_v1.0.z80` et ses 4 écrans `.scr` dans `local/timing-tests/` depuis
   <https://github.com/MrKWatkins/EmulatorTestSuites> ou <https://www.zxspectrum4.net/op_timing.php>).
 - Synchronisation ULA et bus flottant (Jan Bobrowski) : `btime.tap`, `stime.tap` et `ulatest3.tap`
-  (GPL) intégrés dans `tests/iSpectrum.Core.Tests/ZxTests/`.
+  (GPL) intégrés dans `tests/Prizm.Core.Tests/ZxTests/`.
 
 ### Choix de comportement (détaillés en commentaire dans le code)
 
@@ -136,7 +136,7 @@ Timings et ULA :
 - Sauvegarde sur cassette toujours instantanée, comme le piège de FUSE : `SA-BYTES` est
   intercepté à `SA-FLAG` (`0x04D0`, drapeau dans A, début dans IX, longueur dans DE), le bloc
   complet part dans `TapeRecorder`, et la ROM reprend au `RET` de `0x053E`. L'App ajoute chaque
-  bloc à un `.TAP` de `~/Documents/iSpectrum/` nommé d'après le premier en-tête, comme une
+  bloc à un `.TAP` de `~/Documents/Prizm/` nommé d'après le premier en-tête, comme une
   cassette restée en enregistrement ; **Tape > New recording** en commence une autre.
 
 Débogueur :
@@ -231,25 +231,25 @@ les points ci-dessus.
 ## 2. Architecture de la solution
 
 ```
-iSpectrum/
+Prizm/
 ├── AGENTS.md                 # Consignes pour les agents de code (CLAUDE.md y renvoie)
 ├── LICENSE                   # GNU GPL v2 (le projet est GPL-2.0-or-later)
 ├── OVERVIEW.md
 ├── README.md                 # Utilisation : menus, clavier, snapshots, cassettes, débogueur
 ├── Directory.Build.props     # net10.0, Nullable, TreatWarningsAsErrors pour tous les projets
-├── iSpectrum.sln
+├── Prizm.sln
 ├── src/
-│   ├── iSpectrum.Z80/        # CPU Z80 pur (IMemory, IIo), désassembleur
-│   ├── iSpectrum.Core/       # Machines 48K et 128K : mémoire, ULA, clavier, son, AY, frame
+│   ├── Prizm.Z80/        # CPU Z80 pur (IMemory, IIo), désassembleur
+│   ├── Prizm.Core/       # Machines 48K et 128K : mémoire, ULA, clavier, son, AY, frame
 │   │   ├── Tape/             # .TAP, .TZX et lecteur de cassette
 │   │   ├── Snapshots/        # .SNA et .Z80
 │   │   └── Debugging/        # Débogueur, symboles, ligne de commande
-│   └── iSpectrum.App/        # Front-end Raylib-cs : fenêtre, menus, clavier, son, débogueur
+│   └── Prizm.App/        # Front-end Raylib-cs : fenêtre, menus, clavier, son, débogueur
 ├── tests/
-│   ├── iSpectrum.Z80.Tests/
+│   ├── Prizm.Z80.Tests/
 │   │   ├── Fuse/             # Suite FUSE + parseur et runner (provenance dans README.md)
 │   │   └── Zex/              # ZEXDOC/ZEXALL + harnais CP/M (provenance dans README.md)
-│   └── iSpectrum.Core.Tests/
+│   └── Prizm.Core.Tests/
 │       ├── Z80Test/          # z80test de Patrik Rak, MIT (provenance dans README.md)
 │       ├── ZxTests/          # btime, stime, ulatest3 de Jan Bobrowski, GPL (README.md)
 │       ├── ThirdParty/       # Tests de timing de Richard Butler (déposés dans local/timing-tests/)
@@ -346,7 +346,7 @@ image ; avec le débogueur, c'est `Debugger.RunFrame()` qui fait tourner la mach
 - Compter précisément les **T-states** de chaque instruction.
 - Registre `R` (rafraîchissement), modes d'interruption IM 0/1/2, `HALT`, `EI` retardé.
 
-Organisation du code (`src/iSpectrum.Z80`) :
+Organisation du code (`src/Prizm.Z80`) :
 
 | Fichier | Contenu |
 |---|---|
