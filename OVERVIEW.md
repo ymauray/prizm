@@ -11,7 +11,7 @@ GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
 
 ## 0. État d'avancement
 
-**Jalons 1 à 10 terminés** (tags Git `jalon-1` à `jalon-10`) : iSpectrum émule le ZX Spectrum
+**Jalons 1 à 11 terminés** (tags Git `jalon-1` à `jalon-11`) : iSpectrum émule le ZX Spectrum
 **48K** et le **128K** (mémoire paginée, puce son AY-3-8912), avec un **débogueur intégré**
 pensé pour développer en assembleur (sjasmplus, symboles, rechargement en une touche). On y tape du BASIC au clavier du
 Mac, le son sort, il charge et sauvegarde des snapshots `.SNA` et `.Z80`, charge des cassettes
@@ -43,9 +43,10 @@ jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`
   - `Debugging/` : `Debugger` (pause, pas à pas, points d'arrêt et surveillances),
     `SymbolTable` (fichiers de symboles), `DebuggerCommands` (ligne de commande).
 - `src/iSpectrum.App` : fenêtre Raylib-cs (image ×3 sous une barre de menu) ; `MenuBar` (menus
-  File, Machine, Tape, Debug dessinés dans la fenêtre ; menus et raccourcis partagent une seule
-  liste de commandes), `DebuggerPanel` et `SpectrumFont` (le débogueur, dans la police de la
-  ROM), `KeyboardInput` (clavier du Mac traduit), `AudioOutput` (son, et cadence de
+  File, Machine, Tape, Debug, Help dessinés dans la fenêtre ; menus et raccourcis partagent une
+  seule liste de commandes), `DebuggerPanel` et `SpectrumFont` (le débogueur, dans la police de
+  la ROM), `AboutBox` (licence et copyright des ROM, dans la même police), `KeyboardInput`
+  (clavier du Mac traduit, mode étendu compris), `AudioOutput` (son, et cadence de
   l'émulation), `HostShell` (sélecteur de fichier, Finder). Messages dans le titre de la fenêtre.
 - `examples/hello.asm` : premier programme pour sjasmplus (snapshot, cassette et symboles).
 
@@ -65,7 +66,8 @@ jeux librement redistribuables de David Hembrow tournent : *Miner* (1983, `.z80`
   chaque type), comparés front par front aux listes que libspectrum attend ; fichiers
   corrompus rejetés, boucles et sauts qui finissent.
 - Sur les vraies ROM, en relisant l'écran avec la police de la ROM : démarrage du 48K et du
-  menu 128K, `PRINT` tapé au clavier, `BEEP 1,0` (hauteur vérifiée), `PLAY "c"` dans le BASIC
+  menu 128K, `PRINT` tapé au clavier (caractères du mode étendu compris, en 48K et dans
+  l'éditeur du BASIC 128), `BEEP 1,0` (hauteur vérifiée), `PLAY "c"` dans le BASIC
   128, `LOAD ""` depuis le signal et en mode rapide (48K, et « Tape Loader » du 128K), depuis
   un `.TZX` (blocs d'information, bloc d'arrêt, bloc turbo joué en temps réel en mode rapide),
   un programme BASIC qui survit à une sauvegarde puis un chargement dans chaque format.
@@ -171,13 +173,9 @@ Son et App :
 
 ### Reste en suspens
 
-- Barre de menu temporaire, en anglais (police de Raylib sans accents) : de vrais menus macOS
-  viendront avec un front-end plus complet (Avalonia, §6).
 - NMI non implémentée ; +2A/+3, Pentagon et autres modèles non émulés.
 - Latence audio d'environ 90 ms, à réduire si elle gêne.
-- Caractères du mode étendu (`[ ] { } ~ | \ ©`) non traduits au clavier.
 - Tests visuels de l'ULA (`btime`, `stime`, `ulatest3`) : licence et références à trouver.
-- Pas encore de fenêtre « À propos » (copyright Amstrad : `README.md` et `roms/README.md`).
 - TZX : pas d'accélération des chargeurs (FUSE raccourcit les boucles des chargeurs qu'il
   reconnaît ; ici, seul le turbo accélère) ; bloc « select » (`0x28`) ignoré ; les blocs CSW et
   « generalized data » sont décodés en mémoire à l'ouverture. Formats `.PZX` et `.CSW` seuls
@@ -398,10 +396,10 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
   - une texture 320×256 mise à jour à chaque frame, mise à l'échelle ×2 / ×3 ;
   - flux audio intégré (`AudioStream`) pour le beeper et l'AY ;
   - gestion clavier et glisser-déposer de fichiers ;
-  - barre de menu et débogueur dessinés dans la fenêtre (police de Raylib pour les menus,
-    police de la ROM du Spectrum pour le débogueur).
-- **Option ultérieure : Avalonia** (`WriteableBitmap`) si l'on veut une vraie application Mac
-  avec menus natifs, dialogues d'ouverture, préférences. Audio alors via OpenAL (Silk.NET).
+  - barre de menu, débogueur et fenêtre « About » dessinés dans la fenêtre (police de Raylib
+    pour les menus, en anglais faute d'accents ; police de la ROM du Spectrum pour le débogueur
+    et la fenêtre « About »).
+- Des menus natifs (Avalonia) ne sont plus prévus : la barre de menu dessinée convient.
 - Packaging macOS : bundle `.app` (et plus tard signature/notarisation si distribution).
 - Performances : éviter toute allocation dans la boucle chaude, mémoire en `byte[]`,
   `Span<byte>` pour le framebuffer. .NET est largement assez rapide.
@@ -422,6 +420,7 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 | 8 | Modèle 128K | Pagination (port `0x7FFD`) + puce son AY-3-8912 — **terminé** (`jalon-8`) |
 | 9 | Débogueur intégré | Désassembleur, points d'arrêt, vue mémoire/registres — **terminé** (`jalon-9`), avec symboles et rechargement |
 | 10 | `.TZX` | Chargeurs protégés / turbo — **terminé** (`jalon-10`) : Speedlock 1, 2, 4, 7 et Alkatraz chargent |
+| 11 | Finitions | Fenêtre « About » (licence, copyright Amstrad des ROM), caractères du mode étendu tapés au clavier du Mac — **terminé** (`jalon-11`) |
 
 ---
 

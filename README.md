@@ -24,6 +24,7 @@ Une barre de menu, en haut de la fenêtre, réunit toutes les commandes avec leu
 | **Machine** | ZX Spectrum 48K (Cmd+1), ZX Spectrum 128K (Cmd+2), Reset (Cmd+R) |
 | **Tape** | Insert tape... (Cmd+Shift+O), Play / Stop (Cmd+Shift+P), Rewind, Fast loading (Cmd+L), Turbo while loading (Cmd+T) |
 | **Debug** | Show debugger (Cmd+D), Pause / Continue (Cmd+P), Step into (Cmd+I), Step over (Cmd+N), Step out (Cmd+U) |
+| **Help** | About iSpectrum (licence et copyright des ROM) |
 
 **File > Reload** (Cmd+Shift+R) rouvre le dernier fichier ouvert.
 
@@ -55,7 +56,9 @@ quelle que soit sa disposition, et l'émulateur appuie sur les touches Spectrum 
 
 Sur Mac, les touches F1 à F9 demandent Fn, sauf si elles sont réglées comme touches de fonction
 standard dans les réglages du clavier. Les caractères du mode étendu (`[ ] { } ~ | \ ©`) se
-tapent comme sur le Spectrum : Tab, puis Ctrl + la touche. Pour quitter, fermez la fenêtre.
+tapent aussi comme les autres : l'émulateur passe lui-même en mode étendu, puis appuie sur
+Symbol Shift et la touche. On peut toujours faire comme sur le Spectrum : Tab, puis Ctrl + la
+touche. Pour quitter, fermez la fenêtre.
 
 ## Snapshots et cassettes
 
