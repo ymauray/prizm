@@ -6,7 +6,7 @@ using iSpectrum.Z80;
 namespace iSpectrum.Core;
 
 /// <summary>
-/// The ULA: port 0xFE (keyboard and border; the beeper comes with milestone 5) and
+/// The ULA: port 0xFE (keyboard, border and speaker) and
 /// the video output. The whole frame is rendered at once at the end of each frame; line-by-line
 /// rendering, needed for border effects, comes with contention (milestone 7).
 /// </summary>
@@ -23,8 +23,13 @@ public sealed class Ula : IIo
     private readonly uint[] _frameBuffer = new uint[FrameWidth * FrameHeight];
     private int _frameCount;
 
+    private Z80Cpu? _cpu;
+
     /// <summary>The key matrix read through port 0xFE.</summary>
     public Keyboard Keyboard { get; } = new();
+
+    /// <summary>The speaker, driven by bit 4 of port 0xFE.</summary>
+    public Beeper Beeper { get; } = new();
 
     private int _border;
 
@@ -46,11 +51,19 @@ public sealed class Ula : IIo
     public byte In(ushort port) =>
         (port & 1) == 0 ? (byte)(0xE0 | Keyboard.Read((byte)(port >> 8))) : (byte)0xFF;
 
+    /// <summary>Gives the ULA the CPU whose T-state count stamps the speaker changes.</summary>
+    public void Connect(Z80Cpu cpu) => _cpu = cpu;
+
+    /// <summary>
+    /// Bits 0-2 set the border, bit 4 the speaker. Bit 3 (MIC) also reaches the speaker on real
+    /// machines, but only faintly; it is ignored here.
+    /// </summary>
     public void Out(ushort port, byte value)
     {
         if ((port & 1) == 0)
         {
             Border = value;
+            Beeper.SetLevel(_cpu?.TStates ?? 0, (value & 0x10) != 0);
         }
     }
 

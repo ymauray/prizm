@@ -18,6 +18,7 @@ public sealed class Spectrum48
         Memory = new Memory48K(rom);
         Ula = new Ula();
         Cpu = new Z80Cpu(Memory, Ula);
+        Ula.Connect(Cpu);
     }
 
     public Z80Cpu Cpu { get; }
@@ -32,6 +33,9 @@ public sealed class Spectrum48
     /// <summary>The picture of the last completed frame (see <see cref="Ula.FrameBuffer"/>).</summary>
     public ReadOnlySpan<uint> FrameBuffer => Ula.FrameBuffer;
 
+    /// <summary>The sound of the last completed frame (see <see cref="Beeper"/>).</summary>
+    public ReadOnlySpan<short> AudioSamples => Ula.Beeper.Samples;
+
     /// <summary>
     /// Runs one frame. The interrupt is requested while INT is held, so a CPU that has just run
     /// EI still takes it once the next instruction is done; the last instruction may overrun
@@ -40,6 +44,7 @@ public sealed class Spectrum48
     public void RunFrame()
     {
         var interruptTaken = false;
+        Ula.Beeper.StartFrame();
 
         while (Cpu.TStates < FrameTStates)
         {
@@ -51,6 +56,7 @@ public sealed class Spectrum48
             Cpu.Step();
         }
 
+        Ula.Beeper.EndFrame(FrameTStates);
         Cpu.TStates -= FrameTStates;
         Ula.EndFrame(Memory.Contents);
     }
