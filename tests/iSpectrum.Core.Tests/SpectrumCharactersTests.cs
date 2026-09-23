@@ -49,4 +49,21 @@ public class SpectrumCharactersTests
     [InlineData('\n')]
     public void ExtendedModeAndForeignCharacters_AreNotTypable(char c) =>
         Assert.False(SpectrumCharacters.TryGetKeys(c, out _, out _));
+
+    [Theory]
+    [InlineData('[', SpectrumKey.Y)]
+    [InlineData(']', SpectrumKey.U)]
+    [InlineData('{', SpectrumKey.F)]
+    [InlineData('}', SpectrumKey.G)]
+    [InlineData('~', SpectrumKey.A)]
+    [InlineData('|', SpectrumKey.S)]
+    [InlineData('\\', SpectrumKey.D)]
+    [InlineData('©', SpectrumKey.P)]
+    public void ExtendedModeCharacters_UseSymbolShiftAfterTheECursor(char c, SpectrumKey expected)
+    {
+        Assert.False(SpectrumCharacters.TryGetKeys(c, out _, out _));
+        Assert.True(SpectrumCharacters.TryGetExtendedKey(c, out var key));
+        Assert.Equal(expected, key);
+        Assert.Equal([[SpectrumKey.CapsShift, SpectrumKey.SymbolShift], [SpectrumKey.SymbolShift, key]], SpectrumCharacters.ExtendedStrokes(c));
+    }
 }

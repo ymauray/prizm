@@ -6,7 +6,8 @@ namespace iSpectrum.Core;
 /// <summary>
 /// Types key strokes on the machine, one per 10 frames: each is held for 5 frames, long enough
 /// for the ROM, which scans the keyboard once per frame, then released for 5, short of its
-/// auto-repeat delay. Used to type LOAD "" when a tape is inserted.
+/// auto-repeat delay. Used to type LOAD "" when a tape is inserted, and characters that take
+/// more than one stroke.
 /// </summary>
 public sealed class AutoTyper
 {
@@ -36,6 +37,19 @@ public sealed class AutoTyper
         _stroke = 0;
         _frame = 0;
         _delay = delayFrames;
+    }
+
+    /// <summary>Types <paramref name="strokes"/> after those still to type, or at once if there are none.</summary>
+    public void Append(SpectrumKey[][] strokes)
+    {
+        if (!IsBusy)
+        {
+            Start(strokes, 0);
+            return;
+        }
+
+        _strokes = [.. _strokes.AsSpan(_stroke), .. strokes];
+        _stroke = 0;
     }
 
     /// <summary>Sets the typed keys for the frame about to run.</summary>
