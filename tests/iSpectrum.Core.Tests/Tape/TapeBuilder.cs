@@ -79,5 +79,19 @@ internal static class TapeBuilder
     /// <summary>TZX block 0x30: a text description.</summary>
     public static byte[] TextBlock(string text) => [0x30, (byte)text.Length, .. text.Select(c => (byte)c)];
 
+    /// <summary>TZX block 0x28: a menu, each text with the offset (in blocks) it leads to.</summary>
+    public static byte[] SelectBlock(params (int Offset, string Text)[] choices)
+    {
+        var body = new List<byte> { (byte)choices.Length };
+        foreach (var (offset, text) in choices)
+        {
+            body.AddRange(Word(offset));
+            body.Add((byte)text.Length);
+            body.AddRange(text.Select(c => (byte)c));
+        }
+
+        return [0x28, .. Word(body.Count), .. body];
+    }
+
     private static byte[] Word(int value) => [(byte)value, (byte)(value >> 8)];
 }

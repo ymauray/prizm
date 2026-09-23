@@ -2,6 +2,7 @@
 // Copyright (C) 2026 The iSpectrum contributors
 
 using System.IO.Compression;
+using System.Text;
 
 namespace iSpectrum.Core.Tape;
 
@@ -143,9 +144,19 @@ public static class TzxFile
             case 0x27:
                 return new TapeBlock { Kind = TapeBlockKind.Return, Id = id };
 
-            case 0x28: // Select block: a menu for the user of the tape, not played.
-                reader.Bytes(reader.Word());
-                return Info(id);
+            case 0x28:
+            {
+                var body = reader.Sub(reader.Word());
+                var offsets = new int[body.Byte()];
+                var texts = new string[offsets.Length];
+                for (var i = 0; i < offsets.Length; i++)
+                {
+                    offsets[i] = (short)body.Word();
+                    texts[i] = Encoding.ASCII.GetString(body.Bytes(body.Byte()));
+                }
+
+                return new TapeBlock { Kind = TapeBlockKind.Select, Id = id, Offsets = offsets, Texts = texts };
+            }
 
             case 0x2A:
                 reader.Bytes(reader.DWord());
