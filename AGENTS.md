@@ -60,7 +60,9 @@ machine et plan par jalons.
 - Avancer **jalon par jalon** (voir `OVERVIEW.md` §7) ; ne pas commencer un jalon avant que
   le précédent soit fonctionnel et testé.
 - Une branche par jalon (par exemple `jalon-8-128k`), fusionnée dans `main` à la fin du jalon
-  avec un commit de fusion (`git merge --no-ff`) ; le tag `jalon-N` est posé sur `main`.
+  avec un commit de fusion (`git merge --no-ff`) ; le tag `jalon-N` est posé sur `main`. La
+  branche du jalon peut ensuite être supprimée (`git branch -d`) : le tag et le commit de fusion
+  gardent son historique.
 - Petits commits cohérents, un sujet par commit, message clair.
 - Avant de terminer une tâche : `dotnet build` sans avertissement et `dotnet test -c Release` au vert.
 - En cas de doute sur un comportement matériel, se référer à FUSE, au Sinclair Wiki et à
