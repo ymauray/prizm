@@ -170,6 +170,13 @@ public sealed class TapeCursor(TapeImage tape)
         {
             next = _blocks.Count;
             flags |= TapeEdgeFlags.EndOfTape;
+
+            // The tape ends with an edge, which ends the last pulse: a loader that reads it
+            // would otherwise miss the last bit of a block that has no pause after it.
+            if (edge.Transition == TapeTransition.None)
+            {
+                edge = edge with { Transition = TapeTransition.Toggle };
+            }
         }
 
         MoveTo(next);

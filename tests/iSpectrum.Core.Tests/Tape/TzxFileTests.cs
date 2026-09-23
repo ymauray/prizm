@@ -143,7 +143,9 @@ public class TzxFileTests
         [
             (40, 1, LevelHigh), (40, 1, LevelLow), (40, 1, LevelHigh), (40, 1, LevelLow),
             (10, 1, LevelHigh), (10, 1, LevelLow), (20, 1, LevelHigh),
-            (0, 1, NoEdge | Block | Stop | EndOfTape),
+
+            // The edge that ends the last pulse, at the end of the tape.
+            (0, 1, Block | Stop | EndOfTape),
         ];
 
         AssertEdges(expected, Load("raw-data-block.tzx"), 0xFFFF);
@@ -161,7 +163,8 @@ public class TzxFileTests
             expected.Add((1542, 1, 0));
         }
 
-        expected.Add((0, 1, NoEdge | Block | Stop | EndOfTape));
+        // The edge that ends the last pulse, at the end of the tape.
+        expected.Add((0, 1, Block | Stop | EndOfTape));
 
         AssertEdges([.. expected], Load("no-pilot-gdb.tzx"), 0x1FF);
     }

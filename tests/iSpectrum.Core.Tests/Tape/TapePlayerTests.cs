@@ -150,4 +150,29 @@ public class TapePlayerTests
 
         Assert.False(_player.IsPlaying);
     }
+
+    /// <summary>
+    /// Out Run's tape ends with a data block without a pause, then a block that stops the tape:
+    /// the edge that ends its last pulse must come, and last long enough for the loader to see.
+    /// </summary>
+    [Fact]
+    public void ALastPulseWithoutPause_EndsWithAnEdge_BeforeTheTapeStops()
+    {
+        // Pure data: pulses of 500 (0) and 1000 (1), 8 bits used, no pause, one byte 0x00.
+        byte[] pureData = [0x14, 0xF4, 0x01, 0xE8, 0x03, 8, 0, 0, 1, 0, 0, 0x00];
+        _player.Insert(TapeBuilder.Tzx(pureData, TapeBuilder.PauseBlock(0)));
+        _player.Play(0);
+        const long end = 16 * 500;
+
+        _player.AdvanceTo(end - 1, _beeper);
+        var level = _player.Level;
+        _player.AdvanceTo(end, _beeper);
+        Assert.NotEqual(level, _player.Level);
+
+        _player.AdvanceTo(end + 3000, _beeper);
+        Assert.True(_player.IsPlaying);
+
+        _player.AdvanceTo(end + 3500, _beeper);
+        Assert.False(_player.IsPlaying);
+    }
 }

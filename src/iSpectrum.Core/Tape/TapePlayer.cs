@@ -29,6 +29,9 @@ public sealed class TapePlayer : ISoundSource
     /// </summary>
     private const int MaxSilentEdges = 100_000;
 
+    /// <summary>How long the last level is held when the tape stops by itself (1 ms).</summary>
+    private const int StopHold = 3500;
+
     // Loader detection, after FUSE (loader.c): reads of the ULA port this close together
     // (T-states), each with B one more or one less than the last, in a row.
     private const int LoaderReadInterval = 500;
@@ -174,7 +177,9 @@ public sealed class TapePlayer : ISoundSource
             _stopAfterEdge = (edge.Flags & (TapeEdgeFlags.Stop | TapeEdgeFlags.EndOfTape)) != 0
                 || (Is48K && (edge.Flags & TapeEdgeFlags.Stop48) != 0);
 
-            _nextEdge += edge.Duration;
+            // Once stopped, EAR no longer reads the tape: the last level is held a moment first,
+            // so that a loader sees the edge that ends the last pulse.
+            _nextEdge += _stopAfterEdge ? Math.Max(edge.Duration, StopHold) : edge.Duration;
 
             silentEdges = edge.Duration == 0 ? silentEdges + 1 : 0;
             if (silentEdges > MaxSilentEdges)
