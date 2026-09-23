@@ -50,7 +50,7 @@ string? tapeName = null;
 var shownBlock = -1;
 
 // The model new machines are built as (Machine menu).
-var is128 = false;
+var is128 = true;
 Spectrum spectrum = NewMachine();
 
 // The debugger (Debug menu), attached to the machine while its panel is shown. Symbols come

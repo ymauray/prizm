@@ -33,7 +33,7 @@ la police intégrée de Raylib n'a pas de lettres accentuées.
 
 ## Modèles
 
-La machine démarre en 48K. **Cmd+1** allume un 48K, **Cmd+2** un 128K (qui démarre sur son
+La machine démarre en 128K. **Cmd+1** allume un 48K, **Cmd+2** un 128K (qui démarre sur son
 menu : les flèches choisissent, Entrée valide), **Cmd+R** redémarre la machine en cours. Dans le
 BASIC 128, les mots-clés se tapent en toutes lettres : `PLAY "cdefgab"` fait jouer la puce AY.
 
