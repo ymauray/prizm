@@ -21,6 +21,9 @@ internal sealed class AboutBox(SpectrumFont font)
     private static readonly Color Title = new(0, 0, 215, 255);
     private static readonly Color Hint = new(90, 90, 90, 255);
 
+    /// <summary>Laid over the picture behind the box, which would otherwise share its grey.</summary>
+    private static readonly Color Shade = new(0, 0, 0, 160);
+
     private static readonly string[] Lines =
     [
         "iSpectrum",
@@ -78,9 +81,11 @@ internal sealed class AboutBox(SpectrumFont font)
         }
     }
 
-    /// <summary>Draws the box in the middle of the area below the menu bar.</summary>
+    /// <summary>Darkens the area below the menu bar, then draws the box in its middle.</summary>
     public void Draw(int top, int width, int height)
     {
+        Raylib.DrawRectangle(0, top, width, height, Shade);
+
         var boxWidth = (Columns * CharSize) + (2 * Padding);
         var boxHeight = (Lines.Length * LineHeight) + (2 * Padding);
         var x = (width - boxWidth) / 2;
