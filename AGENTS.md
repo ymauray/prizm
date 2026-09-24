@@ -1,8 +1,8 @@
 # AGENTS.md — Consignes pour les agents de code
 
 Ce fichier s'adresse à tout agent de code (Claude Code, Codex, etc.) travaillant sur **Prizm**.
-Lire aussi **`OVERVIEW.md`** : état d'avancement (§0), architecture, détails techniques de la
-machine et plan par jalons.
+Lire aussi **`OVERVIEW.md`** : état d'avancement (§0), architecture et détails techniques de la
+machine.
 
 ## Projet
 
@@ -57,17 +57,18 @@ machine et plan par jalons.
 
 ## Façon de travailler
 
-- Avancer **jalon par jalon** (voir `OVERVIEW.md` §7) ; ne pas commencer un jalon avant que
-  le précédent soit fonctionnel et testé.
-- Une branche par jalon (par exemple `jalon-8-128k`), fusionnée dans `main` à la fin du jalon
-  avec un commit de fusion (`git merge --no-ff`) ; le tag `jalon-N` est posé sur `main`. La
-  branche du jalon peut ensuite être supprimée (`git branch -d`) : le tag et le commit de fusion
-  gardent son historique.
+- Avancer **jalon par jalon** ; ne pas commencer un jalon avant que le précédent soit
+  fonctionnel et testé.
+- `main` est protégée sur GitHub : on n'y pousse jamais directement. Chaque jalon se développe
+  sur sa propre branche (par exemple `jalon-12-plus3`), le temps du travail seulement. À la fin
+  du jalon, la branche est fusionnée dans `main` par une pull request, puis **supprimée**
+  (sur GitHub et en local, `git branch -d`) : le commit de fusion et le tag gardent son
+  historique. Le tag `jalon-N` est posé sur `main`, après la fusion.
 - Petits commits cohérents, un sujet par commit, message clair.
 - Avant de terminer une tâche : `dotnet build` sans avertissement et `dotnet test -c Release` au vert.
 - En cas de doute sur un comportement matériel, se référer à FUSE, au Sinclair Wiki et à
   *The Undocumented Z80 Documented* ; documenter le choix dans un commentaire.
-- Mettre à jour `OVERVIEW.md` si l'architecture ou le plan changent, et son §0 (état
+- Mettre à jour `OVERVIEW.md` si l'architecture change, et son §0 (état
   d'avancement) à la fin de chaque jalon. Chaque jalon terminé reçoit un tag annoté `jalon-N`.
 
 ## ROM et fichiers tiers

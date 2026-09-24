@@ -1,7 +1,7 @@
 # Prizm — Émulateur ZX Spectrum en C#
 
 Projet personnel / open source d'émulateur ZX Spectrum écrit en C# (.NET), sous licence
-GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
+GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §7).
 
 - **Plateforme cible prioritaire** : macOS (Apple Silicon, `osx-arm64`)
 - **Plateformes secondaires** : Linux et Windows, si ça fonctionne « gratuitement » grâce à .NET et aux bibliothèques choisies
@@ -212,8 +212,8 @@ Souhaitable un jour, sans échéance :
 - la **NMI** (saut en `0x0066`), qui n'a d'intérêt qu'avec une interface qui s'en sert, comme le
   Multiface.
 
-**Prochaine étape** : le plan du §7 est terminé ; la suite reste à choisir, par exemple parmi
-les points ci-dessus.
+**Prochaine étape** : les jalons prévus sont tous faits et Prizm est complet ; la suite reste
+à choisir, par exemple parmi les points ci-dessus.
 
 ---
 
@@ -263,7 +263,7 @@ Prizm/
 ├── local/                    # Ignoré par Git : timing_tests_48k_v1.0.z80 (voir README.md)
 └── roms/
     ├── README.md             # Provenance et copyright Amstrad
-    ├── 48.rom                # ROM du 48K (Sinclair/Amstrad, voir §8)
+    ├── 48.rom                # ROM du 48K (Sinclair/Amstrad, voir §7)
     └── 128-0.rom, 128-1.rom  # ROM du 128K : éditeur et menu, BASIC 48K
 ```
 
@@ -432,25 +432,7 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 
 ---
 
-## 7. Plan de travail (jalons)
-
-| # | Jalon | Résultat attendu |
-|---|---|---|
-| 1 | CPU Z80 + harnais de tests | Tests FUSE et ZEXDOC/ZEXALL au vert — **terminé** (`jalon-1`) |
-| 2 | Mémoire + ROM + affichage écran | Message « © 1982 Sinclair Research Ltd » à l'écran — **terminé** (`jalon-2`) |
-| 3 | Clavier | On peut taper et exécuter du BASIC — **terminé** (`jalon-3`) |
-| 4 | Chargement `.SNA` / `.Z80` | Les premiers jeux tournent — **terminé** (`jalon-4`) |
-| 5 | Beeper | Le son fonctionne — **terminé** (`jalon-5`) |
-| 6 | `.TAP` : signal réel et chargement rapide | Chargement des cassettes courantes, avec son et bandes — **terminé** (`jalon-6`) |
-| 7 | Contention mémoire + rendu ligne par ligne | Démos et effets de bordure corrects — **terminé** (`jalon-7`), validation fine par des suites de test à venir |
-| 8 | Modèle 128K | Pagination (port `0x7FFD`) + puce son AY-3-8912 — **terminé** (`jalon-8`) |
-| 9 | Débogueur intégré | Désassembleur, points d'arrêt, vue mémoire/registres — **terminé** (`jalon-9`), avec symboles et rechargement |
-| 10 | `.TZX` | Chargeurs protégés / turbo — **terminé** (`jalon-10`) : Speedlock 1, 2, 4, 7 et Alkatraz chargent |
-| 11 | Finitions | Fenêtre « About » (licence, copyright Amstrad des ROM), caractères du mode étendu tapés au clavier du Mac — **terminé** (`jalon-11`) |
-
----
-
-## 8. La ROM (licence)
+## 7. La ROM (licence)
 
 Amstrad, détenteur des droits Sinclair depuis 1986, autorise la **redistribution** des ROM du
 Spectrum (autorisation informelle, donnée sur Usenet), à condition que :
@@ -466,7 +448,7 @@ Alternative entièrement libre : **OpenSE BASIC** (ROM de remplacement compatibl
 
 ---
 
-## 9. Références
+## 8. Références
 
 - *The Complete Spectrum ROM Disassembly* (Ian Logan & Frank O'Hara)
 - *The Undocumented Z80 Documented* (Sean Young)
