@@ -1,7 +1,7 @@
 # Prizm — Émulateur ZX Spectrum en C#
 
 Projet personnel / open source d'émulateur ZX Spectrum écrit en C# (.NET), sous licence
-GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §7).
+GPL-2.0-or-later (voir `LICENSE`), sauf la ROM (voir §8).
 
 - **Plateforme cible prioritaire** : macOS (Apple Silicon, `osx-arm64`)
 - **Plateformes secondaires** : Linux et Windows, si ça fonctionne « gratuitement » grâce à .NET et aux bibliothèques choisies
@@ -262,7 +262,7 @@ Prizm/
 ├── local/                    # Ignoré par Git : timing_tests_48k_v1.0.z80 (voir README.md)
 └── roms/
     ├── README.md             # Provenance et copyright Amstrad
-    ├── 48.rom                # ROM du 48K (Sinclair/Amstrad, voir §7)
+    ├── 48.rom                # ROM du 48K (Sinclair/Amstrad, voir §8)
     └── 128-0.rom, 128-1.rom  # ROM du 128K : éditeur et menu, BASIC 48K
 ```
 
@@ -431,7 +431,79 @@ préfixe passe par `IndexRegister` au lieu de HL (H et L deviennent IXH/IXL, `(H
 
 ---
 
-## 7. La ROM (licence)
+## 7. Linux et Windows
+
+Prizm est développé et testé sur macOS. Le cœur (`Prizm.Z80`, `Prizm.Core`) est portable ;
+les différences sont toutes dans `Prizm.App`, la publication et la documentation. Ce qu'il
+faudrait modifier :
+
+| ID | Fonctionnalité | A faire pour Linux | A faire pour Windows |
+|---|---|---|---|
+| P1 | Raccourcis des menus (touche Cmd) | Remplacer Super par Alt. | Remplacer Super par Alt. |
+| P2 | Libellés des raccourcis | Afficher « Alt+ » au lieu de « Cmd+ ». | Afficher « Alt+ » au lieu de « Cmd+ ». |
+| P3 | Saisie avec AltGr | Rien (AltGr n'est pas Ctrl). | Ne pas traiter AltGr comme Ctrl. |
+| P4 | Sélecteur de fichier | Repli sur `kdialog`, message si aucun outil. | En écrire un. |
+| P5 | Ouverture du dossier de sauvegarde | Vérifier (`xdg-open`). | Vérifier (Explorateur). |
+| P6 | Dossier de sauvegarde | Utiliser `~/Documents` (XDG). | Vérifier. |
+| P7 | Son et cadence | Vérifier latence et craquements. | Vérifier latence et craquements. |
+| P8 | Affichage haute densité | Vérifier la mise à l'échelle. | Vérifier la mise à l'échelle. |
+| P9 | Intégration continue | Rien (déjà `ubuntu-latest`). | Ajouter `windows-latest`. |
+| P10 | Publication | Ajouter `linux-arm64` (facultatif). | Ajouter `win-x64` (`.zip`). |
+| P11 | Documentation | Clavier et menus selon la plateforme. | Clavier et menus selon la plateforme. |
+
+Détails :
+
+- **P1** : les raccourcis passent par `KeyboardKey.LeftSuper` / `RightSuper`
+  (`MenuBar.HandleShortcuts`, `KeyboardInput.Update`). Sous Windows, cette touche ouvre le menu
+  Démarrer ; sous GNOME ou KDE, le bureau la capture souvent. Ctrl n'est pas utilisable : il
+  sert de Symbol Shift. Alt est libre. Choisir le modificateur selon `OperatingSystem.IsMacOS()`.
+- **P2** : « Cmd+ » est écrit en dur dans `MenuItem` (`MenuBar.cs`) et dans l'invite du
+  débogueur (`DebuggerPanel.cs`, « Cmd+P pauses »).
+- **P3** : sous Windows, AltGr envoie Ctrl + Alt droit. `KeyboardInput.Update` voit alors Ctrl
+  et passe au clavier par position : `@`, `#`, `[`, `{`… ne se tapent plus sur les claviers
+  suisse, français ou allemand. Ignorer Ctrl quand Alt droit est enfoncé en même temps, et
+  exclure AltGr des raccourcis Alt de P1.
+- **P4** : `FileChooser` (`HostShell.cs`) lance `osascript` sur macOS, `zenity` sous Linux, et
+  renonce ailleurs. Sous Linux, `zenity` n'est pas toujours installé (KDE : `kdialog`). Sous
+  Windows : PowerShell et `System.Windows.Forms.OpenFileDialog`, ou `GetOpenFileName` par
+  P/Invoke, toujours dans un processus ou un fil à part pour que l'émulation continue.
+  Glisser-déposer et ligne de commande marchent déjà partout.
+- **P5** : `HostShell.OpenFolder` passe par `UseShellExecute`, qui devrait marcher partout ;
+  seul macOS a été essayé.
+- **P6** : `SpecialFolder.MyDocuments` donne `~/Documents` sur macOS ; sous Linux, .NET peut
+  renvoyer `$HOME` (non vérifié), et `~/Prizm` serait alors créé. Sous Windows, le dossier
+  Documents peut être redirigé vers OneDrive : sans conséquence a priori.
+- **P7** : la cadence vient du callback audio de Raylib (miniaudio : PulseAudio, PipeWire ou
+  ALSA sous Linux, WASAPI sous Windows) avec 1024 échantillons d'avance ; l'anneau devra
+  peut-être grandir sur ces systèmes.
+- **P8** : la fenêtre est créée en pixels (×3, sans `FLAG_WINDOW_HIGHDPI`). Sous Windows avec
+  une mise à l'échelle de 150 % ou plus, l'image peut être petite ou floue.
+- **P9** : `.github/workflows/ci.yml` teste sur `macos-latest` et `ubuntu-latest`. Les tests
+  n'ont jamais tourné sous Windows (chemins, fins de ligne CRLF des fichiers de test si Git les
+  convertit : un `.gitattributes` éviterait la question).
+- **P10** : `.github/workflows/release.yml` publie `osx-arm64` et `linux-x64` seulement.
+- **P11** : le `README.md` parle de Cmd, du Finder, de Fn pour F1 à F9 et du « clavier du
+  Mac ».
+
+Suivi :
+
+| ID | Fait Linux | Fait Windows |
+|---|---|---|
+| P1 | non | non |
+| P2 | non | non |
+| P3 | sans objet | non |
+| P4 | non | non |
+| P5 | non | non |
+| P6 | non | non |
+| P7 | non | non |
+| P8 | non | non |
+| P9 | oui | non |
+| P10 | oui (`linux-x64`) | non |
+| P11 | non | non |
+
+---
+
+## 8. La ROM (licence)
 
 Amstrad, détenteur des droits Sinclair depuis 1986, autorise la **redistribution** des ROM du
 Spectrum (autorisation informelle, donnée sur Usenet), à condition que :
@@ -447,7 +519,7 @@ Alternative entièrement libre : **OpenSE BASIC** (ROM de remplacement compatibl
 
 ---
 
-## 8. Références
+## 9. Références
 
 - *The Complete Spectrum ROM Disassembly* (Ian Logan & Frank O'Hara)
 - *The Undocumented Z80 Documented* (Sean Young)
