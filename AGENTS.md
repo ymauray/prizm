@@ -82,3 +82,17 @@ machine et plan par jalons.
   dont la licence n'est pas formellement déclarée en open source. Les tests qui en dépendent sont
   alors ignorés s'il manque (voir `tests/Prizm.Core.Tests/ThirdParty/LocalFile.cs` et `README.md`).
 - Ne jamais committer de jeux commerciaux ni de fichiers sous copyright.
+
+## Style de réponse
+
+Sois bref et précis. Moins de mots, mais des mots exacts.
+
+- Va droit au résultat. Pas de phrase d'annonce ni de mise en scène.
+  - Non : « Voici ce que j'ai trouvé en relisant le code. »
+  - Non : « J'ai trouvé l'erreur, et elle est plus importante que prévu. »
+  - Oui : « J'ai trouvé la cause du problème. » suivi de la cause.
+- Pas de récapitulatif de ce que je viens de demander, ni de conclusion qui répète ce qui précède.
+- Pas de formules de politesse ni d'enthousiasme (« Parfait ! », « Excellente question »).
+- La brièveté ne doit rien coûter en précision : garde les chemins de fichiers, numéros de ligne, noms de fonctions, messages d'erreur et chiffres exacts.
+- Si un point important mérite d'être signalé (risque, effet de bord, hypothèse non vérifiée), dis-le en une phrase plutôt que de l'omettre.
+
