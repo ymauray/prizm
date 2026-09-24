@@ -193,11 +193,10 @@ Son et App :
 
 ### Reste en suspens
 
-- TZX : les blocs CSW et « generalized data » sont décodés en mémoire à l'ouverture (quelques
-  mégaoctets au plus : sans conséquence).
-
 Souhaitable un jour, sans échéance :
 
+- TZX : les blocs CSW et « generalized data » sont décodés en mémoire à l'ouverture (quelques
+  mégaoctets au plus : sans conséquence).
 - les autres modèles : **+2A/+3** et **Pentagon 128**, entre autres ;
 - la **Beta Disk** (disquettes TR-DOS `.TRD` et `.SCL`), le format de la plupart des démos de la
   scène. Il faudrait le timing du Pentagon (frame de 71 680 T-states, sans contention), le
