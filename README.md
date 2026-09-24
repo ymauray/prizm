@@ -9,7 +9,7 @@ Apple Silicon. Il démarre les ROM d'origine, on y tape du BASIC au clavier du M
 la puce son AY du 128K se font entendre, et il charge snapshots (`.SNA`, `.Z80`) et cassettes
 (`.TAP`, `.TZX`), en temps réel ou instantanément, y compris les chargeurs turbo et protégés.
 
-L'architecture, l'état d'avancement et le plan par jalons sont dans [`OVERVIEW.md`](OVERVIEW.md) ;
+L'architecture et l'état d'avancement sont dans [`OVERVIEW.md`](OVERVIEW.md) ;
 les règles de contribution dans [`CONTRIBUTING.md`](CONTRIBUTING.md) et [`AGENTS.md`](AGENTS.md) ;
 le code de conduite dans [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md).
 
