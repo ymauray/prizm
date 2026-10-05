@@ -1,0 +1,11 @@
+# Fins de ligne normalisées en LF pour tous les fichiers texte.
+* text=auto eol=lf
+
+# Fichiers d'émulation : binaires, jamais convertis.
+*.rom binary
+*.tap binary
+*.tzx binary
+*.z80 binary
+*.sna binary
+*.scr binary
+*.com binary

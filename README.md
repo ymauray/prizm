@@ -3,6 +3,7 @@
 [![CI](https://github.com/ymauray/prizm/actions/workflows/ci.yml/badge.svg)](https://github.com/ymauray/prizm/actions/workflows/ci.yml)
 [![License: GPL v2](https://img.shields.io/badge/License-GPL%20v2-blue.svg)](https://www.gnu.org/licenses/old-licenses/gpl-2.0.html)
 [![.NET 10](https://img.shields.io/badge/.NET-10.0-purple.svg)](https://dotnet.microsoft.com/)
+[![repocheck](https://img.shields.io/badge/repocheck%201.3.0-100%2F100-brightgreen)](https://github.com/ymauray/repocheck)
 
 Émulateur ZX Spectrum **48K** et **128K** écrit en C# (.NET 10), pensé d'abord pour macOS sur
 Apple Silicon. Il démarre les ROM d'origine, on y tape du BASIC au clavier du Mac, le beeper et
